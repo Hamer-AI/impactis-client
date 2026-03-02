@@ -242,7 +242,6 @@ export default function BillingPlanManager({
                                     <div className="flex items-start justify-between gap-2">
                                         <div>
                                             <p className={`text-sm font-semibold ${titleClass}`}>{plan.display_name}</p>
-                                            <p className={`mt-0.5 text-xs ${textMutedClass}`}>{plan.description ?? ''}</p>
                                         </div>
                                         <div className="flex flex-col items-end gap-1">
                                             {isCurrent ? (
