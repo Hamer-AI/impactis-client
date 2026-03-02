@@ -156,6 +156,30 @@ export default async function WorkspaceProfilePage() {
         websiteUrl: profile.website_url,
     })
 
+    const setupAccountDone = !!membership
+    const uploadPhotoDone = !!(profile.avatar_url && profile.avatar_url.trim().length > 0)
+    const personalInfoDone = !!(profile.full_name?.trim().length && profile.phone?.trim().length)
+    const locationDone = !!(profile.location && profile.location.trim().length > 1)
+    const websiteDone = !!(profile.website_url && profile.website_url.trim().length > 8)
+    const linkedinDone = !!(profile.linkedin_url && profile.linkedin_url.trim().length > 8)
+    const timezoneDone = !!(profile.timezone_name && profile.timezone_name.trim().length > 0)
+    const preferredContactDone = !!profile.preferred_contact_method
+    const biographyDone = !!(profile.bio && profile.bio.trim().length >= 20)
+
+    const completionSteps = [
+        setupAccountDone,
+        uploadPhotoDone,
+        personalInfoDone,
+        locationDone,
+        websiteDone,
+        linkedinDone,
+        timezoneDone,
+        preferredContactDone,
+        biographyDone,
+    ]
+    const completedSteps = completionSteps.filter(Boolean).length
+    const profileCompletePercent = Math.round((completedSteps / completionSteps.length) * 100)
+
     const pageShellClass = isLight
         ? 'bg-slate-50 text-slate-900'
         : 'bg-[#070b14] text-slate-100'
@@ -247,115 +271,11 @@ export default async function WorkspaceProfilePage() {
                         </div>
                     </header>
 
-                    <div className="grid gap-8 lg:grid-cols-[300px_minmax(0,1fr)]">
-                        {/* Tab-less Navigation Sidebar */}
-                        <aside className="space-y-6">
-                            <div className={`flex flex-col gap-2 rounded-3xl border p-3 ${panelClass} backdrop-blur-xl`}>
-                                <SidebarNavLink
-                                    href="/workspace"
-                                    label="Dashboard"
-                                    icon={LayoutDashboard}
-                                    activeClassName={navActiveClass}
-                                    idleClassName={navIdleClass}
-                                />
-                                <SidebarNavLink
-                                    href="/workspace/profile"
-                                    label="Profile"
-                                    icon={UserRound}
-                                    active
-                                    activeClassName={navActiveClass}
-                                    idleClassName={navIdleClass}
-                                />
-                                <SidebarNavLink
-                                    href="/workspace/settings"
-                                    label="Organization"
-                                    icon={Building2}
-                                    activeClassName={navActiveClass}
-                                    idleClassName={navIdleClass}
-                                />
-                                <SidebarNavLink
-                                    href="/workspace/preferences"
-                                    label="Settings"
-                                    icon={Settings2}
-                                    activeClassName={navActiveClass}
-                                    idleClassName={navIdleClass}
-                                />
-                            </div>
-
-                            {/* Integrated Profile Strength */}
-                            <div className={`flex flex-col gap-6 rounded-[2.5rem] border p-6 ${panelClass} backdrop-blur-xl`}>
-                                <div className="flex items-center gap-6">
-                                    {/* Circular Visualizer */}
-                                    <div className="relative flex h-16 w-16 shrink-0 items-center justify-center">
-                                        <svg className="h-full w-full -rotate-90 transform">
-                                            <circle
-                                                cx="32"
-                                                cy="32"
-                                                r="28"
-                                                stroke="currentColor"
-                                                strokeWidth="4"
-                                                fill="transparent"
-                                                className={isLight ? 'text-slate-100' : 'text-slate-800'}
-                                            />
-                                            <circle
-                                                cx="32"
-                                                cy="32"
-                                                r="28"
-                                                stroke="currentColor"
-                                                strokeWidth="4"
-                                                fill="transparent"
-                                                strokeDasharray={2 * Math.PI * 28}
-                                                strokeDashoffset={2 * Math.PI * 28 - (completeness.percent / 100) * (2 * Math.PI * 28)}
-                                                strokeLinecap="round"
-                                                className="text-emerald-500 transition-all duration-1000 ease-out"
-                                            />
-                                        </svg>
-                                        <div className="absolute flex flex-col items-center">
-                                            <span className={`text-[13px] font-black tracking-tight ${textMainClass}`}>
-                                                {completeness.percent}%
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex-1 space-y-2">
-                                        <div className="flex items-center justify-between">
-                                            <span className={`text-[9px] font-black uppercase tracking-widest ${textMainClass}`}>Strength</span>
-                                            <Badge variant={completeness.variant} className="rounded-lg px-2 py-0 text-[8px] font-black uppercase">
-                                                {completeness.label}
-                                            </Badge>
-                                        </div>
-                                        <div className={`h-1 w-full overflow-hidden rounded-full ${isLight ? 'bg-slate-100' : 'bg-slate-800'}`}>
-                                            <div
-                                                className="h-full bg-emerald-500 transition-all duration-1000 ws-shimmer"
-                                                style={{ width: `${completeness.percent}%` }}
-                                            />
-                                        </div>
-                                        <p className={`text-[8px] font-bold leading-tight ${textMutedClass}`}>
-                                            {completeness.completed}/{completeness.total} Fields
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <Card className={`${panelClass} overflow-hidden rounded-3xl`}>
-                                <CardHeader className="p-6 pb-4">
-                                    <CardTitle className={`text-xs font-black uppercase tracking-widest ${textMainClass}`}>
-                                        Active Membership
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-6 pt-0">
-                                    <div className={`rounded-2xl border p-4 ${mutedPanelClass}`}>
-                                        <p className={`text-[10px] font-black uppercase tracking-widest text-emerald-500`}>Startup Identity</p>
-                                        <p className={`mt-2 text-sm font-bold ${textMainClass}`}>{membership.organization.name}</p>
-                                        <p className={`mt-1 text-[11px] font-medium ${textMutedClass}`}>Joined {new Date(membership.created_at).toLocaleDateString()}</p>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </aside>
-
+                    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
                         {/* Main Interaction Area */}
                         <div className="space-y-8">
                             <ProfileForm
+                                defaultEmail={user?.email ?? ''}
                                 defaultFullName={profile.full_name ?? ''}
                                 defaultAvatarUrl={profile.avatar_url ?? ''}
                                 defaultLocation={profile.location ?? ''}
@@ -369,6 +289,58 @@ export default async function WorkspaceProfilePage() {
                                 isLight={isLight}
                             />
                         </div>
+
+                        {/* Complete your profile - right column */}
+                        <aside className="space-y-6">
+                            <div className={`flex flex-col gap-6 rounded-[2rem] border p-6 ${panelClass} backdrop-blur-xl sticky top-8`}>
+                                <h3 className={`text-sm font-bold ${textMainClass}`}>Complete your profile</h3>
+                                <div className="relative flex h-24 w-24 shrink-0 items-center justify-center mx-auto">
+                                    <svg className="h-full w-full -rotate-90 transform" viewBox="0 0 100 100">
+                                        <circle cx="50" cy="50" r="42" stroke="currentColor" strokeWidth="8" fill="transparent" className={isLight ? 'text-slate-200' : 'text-slate-700'} />
+                                        <circle cx="50" cy="50" r="42" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray={2 * Math.PI * 42} strokeDashoffset={2 * Math.PI * 42 - (profileCompletePercent / 100) * (2 * Math.PI * 42)} strokeLinecap="round" className="text-emerald-500 transition-all duration-500 ease-out" />
+                                    </svg>
+                                    <span className={`absolute text-lg font-bold ${textMainClass}`}>{profileCompletePercent}%</span>
+                                </div>
+                                <ul className="space-y-3 text-sm">
+                                    <li className={`flex items-center gap-2 ${setupAccountDone ? 'text-emerald-600' : textMutedClass}`}>
+                                        <span>{setupAccountDone ? '✓' : '✗'}</span>
+                                        <span>Setup account</span>
+                                    </li>
+                                    <li className={`flex items-center gap-2 ${uploadPhotoDone ? 'text-emerald-600' : textMutedClass}`}>
+                                        <span>{uploadPhotoDone ? '✓' : '✗'}</span>
+                                        <span>Upload your photo</span>
+                                    </li>
+                                    <li className={`flex items-center gap-2 ${personalInfoDone ? 'text-emerald-600' : textMutedClass}`}>
+                                        <span>{personalInfoDone ? '✓' : '✗'}</span>
+                                        <span>Personal info (name & phone)</span>
+                                    </li>
+                                    <li className={`flex items-center gap-2 ${locationDone ? 'text-emerald-600' : textMutedClass}`}>
+                                        <span>{locationDone ? '✓' : '✗'}</span>
+                                        <span>Location</span>
+                                    </li>
+                                    <li className={`flex items-center gap-2 ${websiteDone ? 'text-emerald-600' : textMutedClass}`}>
+                                        <span>{websiteDone ? '✓' : '✗'}</span>
+                                        <span>Website URL</span>
+                                    </li>
+                                    <li className={`flex items-center gap-2 ${linkedinDone ? 'text-emerald-600' : textMutedClass}`}>
+                                        <span>{linkedinDone ? '✓' : '✗'}</span>
+                                        <span>LinkedIn URL</span>
+                                    </li>
+                                    <li className={`flex items-center gap-2 ${timezoneDone ? 'text-emerald-600' : textMutedClass}`}>
+                                        <span>{timezoneDone ? '✓' : '✗'}</span>
+                                        <span>Timezone</span>
+                                    </li>
+                                    <li className={`flex items-center gap-2 ${preferredContactDone ? 'text-emerald-600' : textMutedClass}`}>
+                                        <span>{preferredContactDone ? '✓' : '✗'}</span>
+                                        <span>Preferred contact</span>
+                                    </li>
+                                    <li className={`flex items-center gap-2 ${biographyDone ? 'text-emerald-600' : textMutedClass}`}>
+                                        <span>{biographyDone ? '✓' : '✗'}</span>
+                                        <span>Bio</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </aside>
                     </div>
                 </div>
             </div>

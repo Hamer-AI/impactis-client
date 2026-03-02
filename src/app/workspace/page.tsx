@@ -248,23 +248,21 @@ function CommandRibbon(input: {
 }
 
 function ReadinessScoreV2(input: {
-    score: number,
     completion: number,
-    target: number,
-    eligibleForDiscovery: boolean,
-    missingSteps: string[],
     isLight: boolean,
     textMainClassName: string,
     textMutedClassName: string
 }) {
+    const normalizedCompletion = Math.max(0, Math.min(100, input.completion))
+    const remaining = Math.max(0, 100 - normalizedCompletion)
     const radius = 45
     const circumference = 2 * Math.PI * radius
-    const offset = circumference - (input.score / 100) * circumference
+    const offset = circumference - (normalizedCompletion / 100) * circumference
 
     return (
         <div className={`relative overflow-hidden rounded-[3rem] border p-8 transition-all hover:shadow-xl hover:shadow-emerald-500/5 ${input.isLight ? 'border-slate-200 bg-white' : 'border-white/5 bg-slate-900/40 backdrop-blur-3xl'}`}>
             <div className="flex flex-col gap-8 md:flex-row md:items-center">
-                {/* Circular Score Visualizer */}
+                {/* Circular Completion Visualizer */}
                 <div className="relative flex h-32 w-32 shrink-0 items-center justify-center">
                     <svg className="h-full w-full -rotate-90 transform">
                         <circle
@@ -290,52 +288,33 @@ function ReadinessScoreV2(input: {
                         />
                     </svg>
                     <div className="absolute flex flex-col items-center">
-                        <span className={`text-3xl font-black tracking-tight ${input.textMainClassName}`}>{input.score}</span>
-                        <span className={`text-[9px] font-black uppercase tracking-widest opacity-40 ${input.textMainClassName}`}>Score</span>
+                        <span className={`text-3xl font-black tracking-tight ${input.textMainClassName}`}>{normalizedCompletion}</span>
+                        <span className={`text-[9px] font-black uppercase tracking-widest opacity-40 ${input.textMainClassName}`}>Filled</span>
                     </div>
                 </div>
 
                 {/* Info & Progress */}
                 <div className="flex-1 space-y-4">
                     <div>
-                        <h3 className={`text-xl font-black tracking-tight ${input.textMainClassName}`}>Readiness Engine</h3>
+                        <h3 className={`text-xl font-black tracking-tight ${input.textMainClassName}`}>Profile Completion</h3>
                         <p className={`mt-2 text-xs font-medium leading-relaxed ${input.textMutedClassName}`}>
-                            Completion <span className="text-emerald-500 font-bold">{input.completion}%</span> and score <span className="text-emerald-500 font-bold">{input.score}%</span>.
-                            <br />
-                            Discovery status: <span className={input.eligibleForDiscovery ? 'text-emerald-500 font-bold' : 'text-amber-500 font-bold'}>
-                                {input.eligibleForDiscovery ? 'Eligible' : 'Blocked'}
-                            </span>
+                            You have filled <span className="text-emerald-500 font-bold">{normalizedCompletion}%</span> of required startup information.
+                            Fill the remaining <span className="text-amber-500 font-bold">{remaining}%</span> to complete your profile.
                         </p>
                     </div>
 
                     <div className="space-y-2">
                         <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest">
-                            <span className={input.textMutedClassName}>Current: {input.score}</span>
-                            <span className={input.textMutedClassName}>Target: {input.target}</span>
-                        </div>
-                        <div className="h-4 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
-                            <div
-                                className="h-full bg-emerald-500 transition-all duration-1000 ease-out ws-shimmer"
-                                style={{ width: `${input.score}%` }}
-                            />
-                        </div>
-                        <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest">
-                            <span className={input.textMutedClassName}>Completion</span>
-                            <span className={input.textMutedClassName}>Target: 70</span>
+                            <span className={input.textMutedClassName}>Completed: {normalizedCompletion}%</span>
+                            <span className={input.textMutedClassName}>Remaining: {remaining}%</span>
                         </div>
                         <div className="h-4 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
                             <div
                                 className="h-full bg-sky-500 transition-all duration-1000 ease-out ws-shimmer"
-                                style={{ width: `${input.completion}%` }}
+                                style={{ width: `${normalizedCompletion}%` }}
                             />
                         </div>
                     </div>
-
-                    {input.missingSteps.length > 0 ? (
-                        <p className={`text-[11px] ${input.textMutedClassName}`}>
-                            Missing: {input.missingSteps.slice(0, 3).join(', ')}
-                        </p>
-                    ) : null}
 
                     <Link
                         href="/workspace/settings?section=settings-startup-readiness"
@@ -344,7 +323,7 @@ function ReadinessScoreV2(input: {
                             : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20'
                             }`}
                     >
-                        Improve score <ArrowRight className="h-3.5 w-3.5" />
+                        Complete profile <ArrowRight className="h-3.5 w-3.5" />
                     </Link>
                 </div>
             </div>
@@ -1106,11 +1085,7 @@ export default async function WorkspacePage() {
                             {membership.organization.type === 'startup' && startupReadiness && (
                                 <div className="space-y-8">
                                     <ReadinessScoreV2
-                                        score={startupReadiness.readiness_score}
                                         completion={startupReadiness.profile_completion_percent}
-                                        target={60}
-                                        eligibleForDiscovery={startupReadiness.eligible_for_discovery_post}
-                                        missingSteps={startupReadiness.missing_steps}
                                         isLight={isLight}
                                         textMainClassName={textMainClass}
                                         textMutedClassName={textMutedClass}

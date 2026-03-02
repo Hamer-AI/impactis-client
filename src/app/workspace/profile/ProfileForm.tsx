@@ -1,18 +1,17 @@
 'use client'
 
-import { useActionState, useState, ChangeEvent, useEffect } from 'react'
+import { useActionState, useState, ChangeEvent, useEffect, MouseEvent } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Separator } from '@/components/ui/separator'
+import { Card, CardContent } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { ActionFeedback } from '@/components/ui/action-feedback'
-import { Trash2, Eye, Pencil } from 'lucide-react'
+import { Pencil, MapPin, Trash2 } from 'lucide-react'
 import { useTransientActionNotice } from '@/lib/use-transient-action-notice'
-import { cn } from '@/lib/utils'
 import { updateProfileAction, type UpdateProfileActionState } from './actions'
 
 type ProfileFormProps = {
+    defaultEmail: string
     defaultFullName: string
     defaultAvatarUrl: string
     defaultLocation: string
@@ -37,6 +36,7 @@ function toTitleCase(value: string): string {
 }
 
 export default function ProfileForm({
+    defaultEmail,
     defaultFullName,
     defaultAvatarUrl,
     defaultLocation,
@@ -51,16 +51,19 @@ export default function ProfileForm({
 }: ProfileFormProps) {
     const [state, formAction, isPending] = useActionState(updateProfileAction, initialState)
     const notice = useTransientActionNotice(state)
-    const [isEditMode, setIsEditMode] = useState(false)
+    const [editingPersonalInfo, setEditingPersonalInfo] = useState(false)
+    const [editingLocation, setEditingLocation] = useState(false)
+    const [editingContacts, setEditingContacts] = useState(false)
+    const [editingBio, setEditingBio] = useState(false)
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-    const [removeCurrentAvatar, setRemoveCurrentAvatar] = useState(false)
+    const [hasNewAvatar, setHasNewAvatar] = useState(false)
 
     const handleAvatarChange = (e: ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (file) {
             const url = URL.createObjectURL(file)
             setPreviewUrl(url)
-            setRemoveCurrentAvatar(false)
+            setHasNewAvatar(true)
         }
     }
 
@@ -91,6 +94,8 @@ export default function ProfileForm({
             return
         }
 
+        // Clear transient avatar state and show success toast.
+        setHasNewAvatar(false)
         toast.success('Profile updated', {
             description: 'Your profile details were saved successfully.',
             duration: 3200,
@@ -111,346 +116,322 @@ export default function ProfileForm({
     }, [notice.error])
 
     return (
-        <form action={formAction} className="space-y-8">
-            {/* Mode Toggle Header */}
-            <div className="flex items-center justify-between px-2">
-                <div className="flex flex-col gap-1">
-                    <h2 className={`text-sm font-black uppercase tracking-widest ${sectionTitleClass}`}>
-                        Profile Settings
-                    </h2>
-                    <p className={`text-[10px] font-bold ${textMutedClass}`}>
-                        {isEditMode ? 'You are currently editing your profile identity.' : 'Viewing your profile identity in read-only mode.'}
-                    </p>
-                </div>
+        <div className="space-y-8">
+            <h1 className={`text-2xl font-bold ${sectionTitleClass}`}>Edit Profile</h1>
 
-                <div className={cn('flex items-center gap-1 rounded-xl border p-1',
-                    isLight ? 'border-slate-200 bg-slate-100/50' : 'border-white/5 bg-slate-950/40'
-                )}>
-                    <button
-                        type="button"
-                        onClick={() => setIsEditMode(false)}
-                        className={cn(
-                            'flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300',
-                            !isEditMode
-                                ? 'bg-blue-600 shadow-lg shadow-blue-500/25 text-white'
-                                : isLight ? 'text-slate-500 hover:text-slate-800' : 'text-slate-400 hover:text-slate-200'
-                        )}
-                    >
-                        <Eye className="h-3 w-3" />
-                        ReadOnly
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setIsEditMode(true)}
-                        className={cn(
-                            'flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300',
-                            isEditMode
-                                ? 'bg-blue-600 shadow-lg shadow-blue-500/25 text-white'
-                                : isLight ? 'text-slate-500 hover:text-slate-800' : 'text-slate-400 hover:text-slate-200'
-                        )}
-                    >
-                        <Pencil className="h-3 w-3" />
-                        Edit Mode
-                    </button>
-                </div>
-            </div>
+            <form action={formAction} className="space-y-8">
+            <input type="hidden" name="avatarCurrentUrl" value={defaultAvatarUrl} />
 
-            {/* Identity Segment */}
-            <Card className={`${panelClass} overflow-hidden rounded-[2rem] backdrop-blur-3xl`}>
-                <CardHeader className="p-8 pb-4">
-                    <div>
-                        <CardTitle className={`text-xl font-black ${sectionTitleClass}`}>Identity Details</CardTitle>
-                        <CardDescription className={textMutedClass}>Your core identification across the Impactis network.</CardDescription>
-                    </div>
-                </CardHeader>
-                <CardContent className="p-8 pt-4">
-                    <div className="grid gap-8">
-                        <div className="flex flex-col gap-6 lg:flex-row lg:items-center">
-                            <div className="relative group shrink-0">
-                                <div className="absolute -inset-1 rounded-full bg-gradient-to-tr from-emerald-500 to-blue-500 opacity-20 blur-sm" />
-                                <Avatar className={`h-24 w-24 border-2 ${isLight ? 'border-white' : 'border-slate-900'}`}>
-                                    <AvatarImage src={previewUrl || defaultAvatarUrl} alt="Avatar Preview" />
-                                    <AvatarFallback className={isLight ? 'bg-slate-100 text-slate-400' : 'bg-slate-800 text-slate-500'}>
-                                        U
-                                    </AvatarFallback>
-                                </Avatar>
-                            </div>
-
-                            <div className="flex-1 space-y-3">
-                                <label htmlFor="avatarFile" className={`block text-[11px] font-black uppercase tracking-widest ${labelClass}`}>
-                                    Update Profile Avatar
-                                </label>
-                                <div className="relative">
-                                    <input type="hidden" name="avatarCurrentUrl" value={defaultAvatarUrl} />
-                                    {isEditMode ? (
-                                        <input
-                                            id="avatarFile"
-                                            name="avatarFile"
-                                            type="file"
-                                            accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
-                                            onChange={handleAvatarChange}
+            {/* Profile photo */}
+            <Card className={`${panelClass} overflow-hidden rounded-2xl`}>
+                <CardContent className="p-6">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+                        <Avatar className={`h-24 w-24 shrink-0 border-2 ${isLight ? 'border-slate-100' : 'border-slate-800'}`}>
+                            <AvatarImage src={previewUrl || defaultAvatarUrl} alt="Profile" />
+                            <AvatarFallback className={isLight ? 'bg-slate-100 text-slate-500' : 'bg-slate-800 text-slate-400'}>
+                                {defaultFullName?.trim() ? defaultFullName.trim().split(/\s+/).slice(0, 2).map((s) => s[0]).join('').toUpperCase() || 'U' : 'U'}
+                            </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 space-y-3">
+                            <input
+                                id="avatarFile"
+                                name="avatarFile"
+                                type="file"
+                                accept="image/jpeg,image/png"
+                                onChange={handleAvatarChange}
+                                disabled={isPending}
+                                className="sr-only"
+                            />
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div className="flex items-center gap-2">
+                                    <label htmlFor="avatarFile" className="inline-block cursor-pointer">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            className="rounded-xl cursor-pointer"
+                                            onClick={() => document.getElementById('avatarFile')?.click()}
+                                        >
+                                            Upload new photo
+                                        </Button>
+                                    </label>
+                                    {hasNewAvatar && (
+                                        <Button
+                                            type="submit"
                                             disabled={isPending}
-                                            className={`w-full rounded-2xl border px-5 py-4 text-sm outline-none transition-all file:mr-4 file:rounded-xl file:border-0 file:bg-emerald-500 file:px-4 file:py-2 file:text-xs file:font-black file:uppercase file:text-white hover:file:bg-emerald-600 disabled:opacity-50 ${inputClass}`}
-                                        />
-                                    ) : (
-                                        <div className={`w-full rounded-2xl border px-5 py-4 text-sm font-medium ${isLight ? 'bg-slate-50/50 border-slate-100 italic' : 'bg-slate-900/30 border-slate-800/50 italic opacity-50'}`}>
-                                            Edit mode required to update avatar
-                                        </div>
+                                            className="rounded-xl bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600"
+                                        >
+                                            Save photo
+                                        </Button>
                                     )}
                                 </div>
-                                <div className="flex items-center justify-between">
-                                    <p className={`text-[10px] font-medium ${textMutedClass}`}>Max 2MB: JPG, PNG, WEBP, or SVG.</p>
-                                    {isEditMode && defaultAvatarUrl && (
-                                        <div className="space-y-1 text-right">
-                                            <input
-                                                id="avatarRemove"
-                                                type="checkbox"
-                                                name="avatarRemove"
-                                                value="1"
-                                                checked={removeCurrentAvatar}
-                                                onChange={(event) => setRemoveCurrentAvatar(event.target.checked)}
-                                                disabled={isPending}
-                                                className="peer sr-only"
-                                            />
-                                            <label
-                                                htmlFor="avatarRemove"
-                                                className={`inline-flex cursor-pointer items-center gap-1.5 rounded-xl border px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-all ${removeCurrentAvatar
-                                                    ? 'border-rose-300 bg-rose-50 text-rose-600'
-                                                    : isLight
-                                                        ? 'border-slate-200 bg-white text-slate-500 hover:border-rose-200 hover:text-rose-500'
-                                                        : 'border-slate-700 bg-slate-900 text-slate-300 hover:border-rose-500/40 hover:text-rose-400'
-                                                    }`}
-                                            >
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                                {removeCurrentAvatar ? 'Will Remove' : 'Remove Current'}
-                                            </label>
-                                            <p className={`text-[10px] font-medium ${removeCurrentAvatar ? 'text-rose-500' : textMutedClass}`}>
-                                                {removeCurrentAvatar ? 'Current avatar will be deleted on save.' : 'Keep current avatar unchanged.'}
-                                            </p>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-
-                        <Separator className={isLight ? 'opacity-50' : 'opacity-10'} />
-
-                        <div className="grid gap-6 md:grid-cols-2">
-                            <div className="space-y-2">
-                                <label htmlFor="fullName" className={`block text-[11px] font-black uppercase tracking-widest ${labelClass}`}>
-                                    Full Name
-                                </label>
-                                {isEditMode ? (
-                                    <input
-                                        id="fullName"
-                                        name="fullName"
-                                        defaultValue={defaultFullName}
+                                {defaultAvatarUrl ? (
+                                    <button
+                                        type="submit"
+                                        name="avatarRemove"
+                                        value="1"
+                                        onClick={(event: MouseEvent<HTMLButtonElement>) => {
+                                            if (isPending) return
+                                            const confirmed = window.confirm(
+                                                'Remove your current photo? You can upload a new one anytime.',
+                                            )
+                                            if (!confirmed) {
+                                                event.preventDefault()
+                                                event.stopPropagation()
+                                            }
+                                        }}
                                         disabled={isPending}
-                                        placeholder="e.g. Jane Cooper"
-                                        className={`w-full rounded-2xl border px-5 py-4 text-sm font-medium outline-none transition-all ${inputClass}`}
-                                    />
-                                ) : (
-                                    <div className={`w-full rounded-2xl border px-5 py-4 text-sm font-bold ${textMainClass} ${isLight ? 'bg-slate-50/50 border-slate-100' : 'bg-slate-950/50 border-slate-800'}`}>
-                                        {defaultFullName || 'Not set'}
-                                    </div>
-                                )}
+                                        className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-100 hover:border-rose-300"
+                                        title="Remove photo"
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                        <span>Remove photo</span>
+                                    </button>
+                                ) : null}
                             </div>
-
-                            <div className="space-y-2">
-                                <label htmlFor="location" className={`block text-[11px] font-black uppercase tracking-widest ${labelClass}`}>
-                                    Global Location
-                                </label>
-                                {isEditMode ? (
-                                    <input
-                                        id="location"
-                                        name="location"
-                                        defaultValue={defaultLocation}
-                                        disabled={isPending}
-                                        placeholder="e.g. San Francisco, US"
-                                        className={`w-full rounded-2xl border px-5 py-4 text-sm font-medium outline-none transition-all ${inputClass}`}
-                                    />
-                                ) : (
-                                    <div className={`w-full rounded-2xl border px-5 py-4 text-sm font-bold ${textMainClass} ${isLight ? 'bg-slate-50/50 border-slate-100' : 'bg-slate-950/50 border-slate-800'}`}>
-                                        {defaultLocation || 'Not set'}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="grid gap-6 md:grid-cols-2">
-                            <div className="space-y-2">
-                                <label htmlFor="headline" className={`block text-[11px] font-black uppercase tracking-widest ${labelClass}`}>
-                                    Professional Headline
-                                </label>
-                                {isEditMode ? (
-                                    <input
-                                        id="headline"
-                                        name="headline"
-                                        defaultValue={defaultHeadline}
-                                        disabled={isPending}
-                                        placeholder="e.g. Fintech Product Leader"
-                                        className={`w-full rounded-2xl border px-5 py-4 text-sm font-medium outline-none transition-all ${inputClass}`}
-                                    />
-                                ) : (
-                                    <div className={`w-full rounded-2xl border px-5 py-4 text-sm font-bold ${textMainClass} ${isLight ? 'bg-slate-50/50 border-slate-100' : 'bg-slate-950/50 border-slate-800'}`}>
-                                        {defaultHeadline || 'Not set'}
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="space-y-2">
-                                <label htmlFor="phone" className={`block text-[11px] font-black uppercase tracking-widest ${labelClass}`}>
-                                    Phone Number
-                                </label>
-                                {isEditMode ? (
-                                    <input
-                                        id="phone"
-                                        name="phone"
-                                        defaultValue={defaultPhone}
-                                        disabled={isPending}
-                                        placeholder="+251912345678"
-                                        className={`w-full rounded-2xl border px-5 py-4 text-sm font-medium outline-none transition-all ${inputClass}`}
-                                    />
-                                ) : (
-                                    <div className={`w-full rounded-2xl border px-5 py-4 text-sm font-bold ${textMainClass} ${isLight ? 'bg-slate-50/50 border-slate-100' : 'bg-slate-950/50 border-slate-800'}`}>
-                                        {defaultPhone || 'Not set'}
-                                    </div>
-                                )}
-                                <p className={`text-[10px] font-medium ${textMutedClass}`}>
-                                    Use international format (E.164).
-                                </p>
-                            </div>
+                            <p className={`text-xs ${textMutedClass}`}>At least 800×800 px recommended. JPG or PNG is allowed.</p>
                         </div>
                     </div>
                 </CardContent>
             </Card>
 
-            {/* Professional Segment */}
-            <Card className={`${panelClass} overflow-hidden rounded-[2rem] backdrop-blur-3xl`}>
-                <CardHeader className="p-8 pb-4">
-                    <div>
-                        <CardTitle className={`text-xl font-black ${sectionTitleClass}`}>Professional Summary</CardTitle>
-                        <CardDescription className={textMutedClass}>Briefly describe your expertise for better matching.</CardDescription>
+            {/* Personal Info */}
+            <Card className={`${panelClass} overflow-hidden rounded-2xl`}>
+                <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                        <h2 className={`text-base font-semibold ${sectionTitleClass}`}>Personal Info</h2>
+                        {!editingPersonalInfo ? (
+                            <button type="button" onClick={() => setEditingPersonalInfo(true)} className={`flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-medium ${textMutedClass} hover:opacity-80`}>
+                                <Pencil className="h-4 w-4" /> Edit
+                            </button>
+                        ) : null}
                     </div>
-                </CardHeader>
-                <CardContent className="p-8 pt-4">
-                    <div className="space-y-6">
-                        <div className="grid gap-6 md:grid-cols-2">
-                            <div className="space-y-2">
-                                <label htmlFor="websiteUrl" className={`block text-[11px] font-black uppercase tracking-widest ${labelClass}`}>
-                                    Website URL
-                                </label>
-                                {isEditMode ? (
-                                    <input
-                                        id="websiteUrl"
-                                        name="websiteUrl"
-                                        defaultValue={defaultWebsiteUrl}
-                                        disabled={isPending}
-                                        placeholder="https://example.com"
-                                        className={`w-full rounded-2xl border px-5 py-4 text-sm font-medium outline-none transition-all ${inputClass}`}
-                                    />
-                                ) : (
-                                    <div className={`w-full rounded-2xl border px-5 py-4 text-sm font-bold ${textMainClass} ${isLight ? 'bg-slate-50/50 border-slate-100' : 'bg-slate-950/50 border-slate-800'}`}>
-                                        {defaultWebsiteUrl || 'Not set'}
-                                    </div>
-                                )}
+                    {editingPersonalInfo ? (
+                        <div className="mt-4 space-y-4">
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <div>
+                                    <label className={`block text-xs font-medium ${labelClass}`}>Full Name</label>
+                                    <input name="fullName" defaultValue={defaultFullName} className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm ${inputClass}`} />
+                                </div>
+                                <div>
+                                    <label className={`block text-xs font-medium ${labelClass}`}>Phone</label>
+                                    <input name="phone" defaultValue={defaultPhone} placeholder="(219) 555-0114" className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm ${inputClass}`} />
+                                </div>
                             </div>
-
-                            <div className="space-y-2">
-                                <label htmlFor="linkedinUrl" className={`block text-[11px] font-black uppercase tracking-widest ${labelClass}`}>
-                                    LinkedIn URL
-                                </label>
-                                {isEditMode ? (
-                                    <input
-                                        id="linkedinUrl"
-                                        name="linkedinUrl"
-                                        defaultValue={defaultLinkedinUrl}
-                                        disabled={isPending}
-                                        placeholder="https://www.linkedin.com/in/your-handle"
-                                        className={`w-full rounded-2xl border px-5 py-4 text-sm font-medium outline-none transition-all ${inputClass}`}
-                                    />
-                                ) : (
-                                    <div className={`w-full rounded-2xl border px-5 py-4 text-sm font-bold ${textMainClass} ${isLight ? 'bg-slate-50/50 border-slate-100' : 'bg-slate-950/50 border-slate-800'}`}>
-                                        {defaultLinkedinUrl || 'Not set'}
-                                    </div>
-                                )}
+                            <p className={`text-xs ${textMutedClass}`}>Email is from your account.</p>
+                            <div className="flex gap-2">
+                                <Button type="button" variant="outline" onClick={() => setEditingPersonalInfo(false)} className="rounded-xl">Cancel</Button>
+                                <Button type="submit" disabled={isPending} className="rounded-xl bg-blue-600 hover:bg-blue-700">Save changes</Button>
                             </div>
                         </div>
+                    ) : (
+                        <dl className={`mt-4 space-y-2 text-sm ${textMainClass}`}>
+                            <div><span className={textMutedClass}>Full Name: </span>{defaultFullName || '—'}</div>
+                            <div><span className={textMutedClass}>Email: </span>{defaultEmail || '—'}</div>
+                            <div><span className={textMutedClass}>Phone: </span>{defaultPhone || '—'}</div>
+                        </dl>
+                    )}
+                </CardContent>
+            </Card>
 
-                        <div className="grid gap-6 md:grid-cols-2">
-                            <div className="space-y-2">
-                                <label htmlFor="timezoneName" className={`block text-[11px] font-black uppercase tracking-widest ${labelClass}`}>
-                                    Timezone (Required)
+            {/* Location */}
+            <Card className={`${panelClass} overflow-hidden rounded-2xl`}>
+                <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                        <h2 className={`text-base font-semibold ${sectionTitleClass}`}>Location</h2>
+                        {!editingLocation ? (
+                            <button
+                                type="button"
+                                onClick={() => setEditingLocation(true)}
+                                className={`flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-medium ${textMutedClass} hover:opacity-80`}
+                            >
+                                <Pencil className="h-4 w-4" /> Edit
+                            </button>
+                        ) : null}
+                    </div>
+
+                    {editingLocation ? (
+                        <div className="mt-4 flex flex-wrap items-end gap-3">
+                            <div className="flex-1 min-w-[200px]">
+                                <label htmlFor="location" className="sr-only">
+                                    Location
                                 </label>
-                                {isEditMode ? (
+                                <div
+                                    className={`flex rounded-xl border ${
+                                        isLight ? 'border-slate-200 bg-white' : 'border-slate-700 bg-slate-950'
+                                    }`}
+                                >
+                                    <span className={`flex items-center pl-3 ${textMutedClass}`}>
+                                        <MapPin className="h-4 w-4" />
+                                    </span>
                                     <input
-                                        id="timezoneName"
-                                        name="timezoneName"
-                                        defaultValue={defaultTimezoneName}
-                                        required
-                                        disabled={isPending}
-                                        placeholder="e.g. Africa/Addis_Ababa"
-                                        className={`w-full rounded-2xl border px-5 py-4 text-sm font-medium outline-none transition-all ${inputClass}`}
+                                        id="location"
+                                        name="location"
+                                        defaultValue={defaultLocation}
+                                        placeholder="e.g. California"
+                                        className={`flex-1 border-0 bg-transparent px-3 py-2.5 text-sm outline-none ${textMainClass}`}
                                     />
-                                ) : (
-                                    <div className={`w-full rounded-2xl border px-5 py-4 text-sm font-bold ${textMainClass} ${isLight ? 'bg-slate-50/50 border-slate-100' : 'bg-slate-950/50 border-slate-800'}`}>
-                                        {defaultTimezoneName || 'Not set'}
-                                    </div>
-                                )}
-                                <p className={`text-[10px] font-medium ${textMutedClass}`}>
-                                    Required IANA format.
-                                </p>
+                                </div>
+                            </div>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="rounded-xl"
+                                onClick={() => setEditingLocation(false)}
+                            >
+                                Cancel
+                            </Button>
+                            <Button type="submit" disabled={isPending} className="rounded-xl bg-blue-600 hover:bg-blue-700">
+                                Save changes
+                            </Button>
+                        </div>
+                    ) : (
+                        <div className="mt-4 flex items-center gap-2 text-sm">
+                            <span className={textMutedClass}>
+                                <MapPin className="h-4 w-4" />
+                            </span>
+                            <span className={textMainClass}>{defaultLocation || 'No location set yet.'}</span>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            {/* Contact & links */}
+            <Card className={`${panelClass} overflow-hidden rounded-2xl`}>
+                <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                        <h2 className={`text-base font-semibold ${sectionTitleClass}`}>Contact & links</h2>
+                        {!editingContacts ? (
+                            <button
+                                type="button"
+                                onClick={() => setEditingContacts(true)}
+                                className={`flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-medium ${textMutedClass} hover:opacity-80`}
+                            >
+                                <Pencil className="h-4 w-4" /> Edit
+                            </button>
+                        ) : null}
+                    </div>
+
+                    {editingContacts ? (
+                        <div className="mt-4 space-y-4">
+                            <div className="grid gap-3 md:grid-cols-2">
+                                <div>
+                                    <label className={`block text-xs font-medium ${labelClass}`}>Website URL</label>
+                                    <input
+                                        name="websiteUrl"
+                                        defaultValue={defaultWebsiteUrl}
+                                        placeholder="https://example.com"
+                                        className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm ${inputClass}`}
+                                    />
+                                </div>
+                                <div>
+                                    <label className={`block text-xs font-medium ${labelClass}`}>LinkedIn URL</label>
+                                    <input
+                                        name="linkedinUrl"
+                                        defaultValue={defaultLinkedinUrl}
+                                        placeholder="https://www.linkedin.com/in/your-handle"
+                                        className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm ${inputClass}`}
+                                    />
+                                </div>
                             </div>
 
-                            <div className="space-y-2">
-                                <label htmlFor="preferredContactMethod" className={`block text-[11px] font-black uppercase tracking-widest ${labelClass}`}>
-                                    Preferred Contact
-                                </label>
-                                {isEditMode ? (
+                            <div className="grid gap-3 md:grid-cols-2">
+                                <div>
+                                    <label className={`block text-xs font-medium ${labelClass}`}>Timezone</label>
+                                    <input
+                                        name="timezoneName"
+                                        defaultValue={defaultTimezoneName}
+                                        placeholder="e.g. Africa/Addis_Ababa"
+                                        className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm ${inputClass}`}
+                                    />
+                                    <p className={`mt-1 text-[11px] ${textMutedClass}`}>Use IANA format (e.g. Europe/London).</p>
+                                </div>
+                                <div>
+                                    <label className={`block text-xs font-medium ${labelClass}`}>Preferred contact</label>
                                     <select
-                                        id="preferredContactMethod"
                                         name="preferredContactMethod"
                                         defaultValue={defaultPreferredContactMethod}
-                                        disabled={isPending}
-                                        className={`w-full rounded-2xl border px-5 py-4 text-sm font-medium outline-none transition-all ${selectClass}`}
+                                        className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm ${selectClass}`}
                                     >
-                                        <option value="">No Preference</option>
+                                        <option value="">No preference</option>
                                         <option value="email">Email</option>
                                         <option value="phone">Phone</option>
                                         <option value="linkedin">LinkedIn</option>
                                     </select>
-                                ) : (
-                                    <div className={`w-full rounded-2xl border px-5 py-4 text-sm font-bold ${textMainClass} ${isLight ? 'bg-slate-50/50 border-slate-100' : 'bg-slate-950/50 border-slate-800'}`}>
-                                        {toTitleCase(defaultPreferredContactMethod) || 'No Preference'}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label htmlFor="bio" className={`block text-[11px] font-black uppercase tracking-widest ${labelClass}`}>
-                                Professional Bio
-                            </label>
-                            {isEditMode ? (
-                                <textarea
-                                    id="bio"
-                                    name="bio"
-                                    defaultValue={defaultBio}
-                                    disabled={isPending}
-                                    rows={6}
-                                    placeholder="Write a short summary about yourself..."
-                                    className={`w-full resize-none rounded-2xl border px-5 py-4 text-sm font-medium leading-relaxed outline-none transition-all ${inputClass}`}
-                                />
-                            ) : (
-                                <div className={`w-full min-h-[144px] rounded-2xl border px-5 py-4 text-sm font-medium leading-relaxed ${textMainClass} ${isLight ? 'bg-slate-50/50 border-slate-100' : 'bg-slate-950/50 border-slate-800'}`}>
-                                    {defaultBio || 'No professional bio provided yet.'}
                                 </div>
-                            )}
-                            <div className="flex items-center justify-end">
-                                <p className={`text-[10px] font-medium ${textMutedClass}`}>Recommended: 200-500 characters.</p>
+                            </div>
+
+                            <div className="flex gap-2">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="rounded-xl"
+                                    onClick={() => setEditingContacts(false)}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button type="submit" disabled={isPending} className="rounded-xl bg-blue-600 hover:bg-blue-700">
+                                    Save changes
+                                </Button>
                             </div>
                         </div>
+                    ) : (
+                        <dl className={`mt-4 space-y-2 text-sm ${textMainClass}`}>
+                            <div>
+                                <span className={textMutedClass}>Website: </span>
+                                <span>{defaultWebsiteUrl || '—'}</span>
+                            </div>
+                            <div>
+                                <span className={textMutedClass}>LinkedIn: </span>
+                                <span>{defaultLinkedinUrl || '—'}</span>
+                            </div>
+                            <div>
+                                <span className={textMutedClass}>Timezone: </span>
+                                <span>{defaultTimezoneName || '—'}</span>
+                            </div>
+                            <div>
+                                <span className={textMutedClass}>Preferred contact: </span>
+                                <span>{toTitleCase(defaultPreferredContactMethod) || 'No preference'}</span>
+                            </div>
+                        </dl>
+                    )}
+                </CardContent>
+            </Card>
+
+            {/* Hidden fields for submit from non-editing sections */}
+            {!editingPersonalInfo && <input type="hidden" name="fullName" value={defaultFullName} />}
+            {!editingPersonalInfo && <input type="hidden" name="phone" value={defaultPhone} />}
+            {!editingLocation && <input type="hidden" name="location" value={defaultLocation} />}
+            {!editingContacts && <input type="hidden" name="websiteUrl" value={defaultWebsiteUrl} />}
+            {!editingContacts && <input type="hidden" name="linkedinUrl" value={defaultLinkedinUrl} />}
+            {!editingContacts && <input type="hidden" name="timezoneName" value={defaultTimezoneName || 'UTC'} />}
+            {!editingContacts && <input type="hidden" name="preferredContactMethod" value={defaultPreferredContactMethod} />}
+            {!editingBio && <input type="hidden" name="bio" value={defaultBio} />}
+            <input type="hidden" name="headline" value={defaultHeadline} />
+
+            {/* Bio */}
+            <Card className={`${panelClass} overflow-hidden rounded-2xl`}>
+                <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                        <h2 className={`text-base font-semibold ${sectionTitleClass}`}>Bio</h2>
+                        {!editingBio ? (
+                            <button type="button" onClick={() => setEditingBio(true)} className={`flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-medium ${textMutedClass} hover:opacity-80`}>
+                                <Pencil className="h-4 w-4" /> Edit
+                            </button>
+                        ) : null}
                     </div>
+                    {editingBio ? (
+                        <div className="mt-4 space-y-4">
+                            <textarea name="bio" defaultValue={defaultBio} rows={4} placeholder="Write a short bio..." className={`w-full resize-none rounded-xl border px-3 py-2 text-sm ${inputClass}`} />
+                            <div className="flex gap-2">
+                                <Button type="button" variant="outline" onClick={() => setEditingBio(false)} className="rounded-xl">Cancel</Button>
+                                <Button type="submit" disabled={isPending} className="rounded-xl bg-blue-600 hover:bg-blue-700">Save changes</Button>
+                            </div>
+                        </div>
+                    ) : (
+                        <p className={`mt-4 text-sm leading-relaxed ${textMainClass}`}>
+                            {defaultBio && defaultBio.length > 180 ? `${defaultBio.slice(0, 180).trim()}…` : defaultBio || 'No biography provided yet.'}
+                        </p>
+                    )}
                 </CardContent>
             </Card>
 
@@ -476,24 +457,10 @@ export default function ProfileForm({
                 </div>
 
                 <div className="flex shrink-0 items-center gap-4">
-                    {isEditMode && (
-                        <Button
-                            type="submit"
-                            disabled={isPending}
-                            className="h-14 rounded-2xl bg-emerald-500 px-10 text-sm font-black uppercase tracking-widest text-white shadow-xl shadow-emerald-500/20 transition-all hover:bg-emerald-600 hover:shadow-emerald-500/40 active:scale-95 disabled:opacity-50"
-                        >
-                            {isPending ? (
-                                <div className="flex items-center gap-2">
-                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                                    Processing...
-                                </div>
-                            ) : (
-                                'Update Identity'
-                            )}
-                        </Button>
-                    )}
+                    {/* Per-section Save changes buttons are inside each card */}
                 </div>
             </div>
         </form>
+        </div>
     )
 }
