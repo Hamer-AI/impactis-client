@@ -8,7 +8,6 @@ import { Eye, Pencil } from 'lucide-react'
 import { useTransientActionNotice } from '@/lib/use-transient-action-notice'
 import { cn } from '@/lib/utils'
 import type {
-    StartupPitchDeckMediaKind,
     StartupPostStatus,
     StartupReadiness,
 } from '@/modules/startups'
@@ -30,10 +29,6 @@ type SettingsFormProps = {
     defaultOrganizationLogoUrl: string
     defaultOrganizationIndustryTags: string
     defaultStartupWebsiteUrl: string
-    defaultStartupPitchDeckUrl: string
-    defaultStartupPitchDeckMediaKind: StartupPitchDeckMediaKind | null
-    defaultStartupPitchDeckFileName: string
-    defaultStartupPitchDeckFileSizeBytes: number | null
     defaultStartupTeamOverview: string
     defaultStartupCompanyStage: string
     defaultStartupFoundingYear: number | null
@@ -43,12 +38,6 @@ type SettingsFormProps = {
     defaultStartupTractionSummary: string
     defaultStartupFinancialSummary: string
     defaultStartupLegalSummary: string
-    defaultStartupFinancialDocUrl: string
-    defaultStartupFinancialDocFileName: string
-    defaultStartupFinancialDocFileSizeBytes: number | null
-    defaultStartupLegalDocUrl: string
-    defaultStartupLegalDocFileName: string
-    defaultStartupLegalDocFileSizeBytes: number | null
     defaultInvestorThesis: string
     defaultInvestorSectorTags: string
     defaultInvestorCheckSizeMinUsd: number | null
@@ -88,7 +77,7 @@ export default function SettingsForm(props: SettingsFormProps) {
     }, [identityNotice])
 
     useEffect(() => {
-        if (readinessNotice.success) toast.success('Readiness fields saved')
+        if (readinessNotice.success) toast.success('Readiness profile saved')
         if (readinessNotice.error) toast.error('Readiness update failed', { description: readinessNotice.error })
     }, [readinessNotice])
 
@@ -207,7 +196,6 @@ export default function SettingsForm(props: SettingsFormProps) {
                                 inputClass={inputClass}
                                 textMutedClass={textMutedClass}
                                 textMainClass={textMainClass}
-                                titleClass={titleClass}
                             />
                         )}
 

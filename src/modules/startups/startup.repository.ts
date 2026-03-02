@@ -25,6 +25,8 @@ const STARTUP_POST_STATUSES = new Set<StartupPostStatus>(['draft', 'published'])
 const STARTUP_PITCH_DECK_MEDIA_KINDS = new Set<StartupPitchDeckMediaKind>(['document', 'video'])
 const STARTUP_DATA_ROOM_DOCUMENT_TYPES = new Set<StartupDataRoomDocumentType>([
     'pitch_deck',
+    'financial_doc',
+    'legal_doc',
     'financial_model',
     'cap_table',
     'traction_metrics',
@@ -94,6 +96,8 @@ type StartupDataRoomDocumentRow = {
     document_type: string
     title: string
     file_url: string
+    storage_bucket: string | null
+    storage_object_path: string | null
     file_name: string | null
     file_size_bytes: number | null
     content_type: string | null
@@ -251,6 +255,14 @@ function normalizeStartupDataRoomDocumentType(value: unknown): StartupDataRoomDo
     }
 
     const normalized = value.trim().toLowerCase()
+    if (normalized === 'financial_doc') {
+        return 'financial_model'
+    }
+
+    if (normalized === 'legal_doc') {
+        return 'legal_company_docs'
+    }
+
     return STARTUP_DATA_ROOM_DOCUMENT_TYPES.has(normalized as StartupDataRoomDocumentType)
         ? (normalized as StartupDataRoomDocumentType)
         : null
@@ -354,6 +366,8 @@ function mapStartupDataRoomDocument(row: StartupDataRoomDocumentRow): StartupDat
         document_type: documentType,
         title,
         file_url: fileUrl,
+        storage_bucket: normalizeText(row.storage_bucket),
+        storage_object_path: normalizeText(row.storage_object_path),
         file_name: normalizeText(row.file_name),
         file_size_bytes: normalizeNullableNumber(row.file_size_bytes),
         content_type: normalizeText(row.content_type),
@@ -596,7 +610,9 @@ export async function upsertStartupDataRoomDocumentForCurrentUser(
     input: {
         documentType: StartupDataRoomDocumentType
         title: string
-        fileUrl: string
+        fileUrl?: string | null
+        storageBucket?: string | null
+        storageObjectPath?: string | null
         fileName?: string | null
         fileSizeBytes?: number | null
         contentType?: string | null
@@ -606,14 +622,19 @@ export async function upsertStartupDataRoomDocumentForCurrentUser(
     const documentType = normalizeStartupDataRoomDocumentType(input.documentType)
     const title = normalizeText(input.title)
     const fileUrl = normalizeText(input.fileUrl)
+    const storageBucket = normalizeText(input.storageBucket)
+    const storageObjectPath = normalizeText(input.storageObjectPath)
     if (!documentType) {
         throw new Error('Data room document type is invalid.')
     }
     if (!title || title.length < 2) {
         throw new Error('Data room document title must be at least 2 characters.')
     }
-    if (!fileUrl) {
-        throw new Error('Data room file URL is required.')
+    if ((storageBucket && !storageObjectPath) || (!storageBucket && storageObjectPath)) {
+        throw new Error('Storage bucket and storage object path must be provided together.')
+    }
+    if (!fileUrl && (!storageBucket || !storageObjectPath)) {
+        throw new Error('Data room file URL or storage reference is required.')
     }
 
     const accessToken = await getAccessToken(supabase)
@@ -629,6 +650,8 @@ export async function upsertStartupDataRoomDocumentForCurrentUser(
             documentType,
             title,
             fileUrl,
+            storageBucket,
+            storageObjectPath,
             fileName: normalizeText(input.fileName),
             fileSizeBytes: normalizeNullableNumber(input.fileSizeBytes),
             contentType: normalizeText(input.contentType),

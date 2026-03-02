@@ -21,19 +21,32 @@ const initialState: SettingsSectionActionState = {
     success: null,
 }
 
-const DATA_ROOM_DOCUMENT_TYPE_OPTIONS: Array<{
+const DATA_ROOM_UPLOAD_DOCUMENT_TYPE_OPTIONS: Array<{
     value: StartupDataRoomDocumentType
     label: string
 }> = [
         { value: 'pitch_deck', label: 'Pitch Deck (Investor Version)' },
-        { value: 'financial_model', label: 'Financial Model' },
+        { value: 'financial_model', label: 'Financial Readiness Document' },
+        { value: 'legal_company_docs', label: 'Legal Readiness Document' },
         { value: 'cap_table', label: 'Cap Table' },
         { value: 'traction_metrics', label: 'Traction Metrics' },
-        { value: 'legal_company_docs', label: 'Legal and Company Docs' },
         { value: 'incorporation_docs', label: 'Incorporation Docs' },
         { value: 'customer_contracts_summaries', label: 'Customer and Contracts Summaries' },
         { value: 'term_sheet_drafts', label: 'Term Sheet Drafts' },
     ]
+
+const DATA_ROOM_DOCUMENT_TYPE_LABELS: Record<StartupDataRoomDocumentType, string> = {
+    pitch_deck: 'Pitch Deck (Investor Version)',
+    financial_doc: 'Financial Readiness Document',
+    legal_doc: 'Legal Readiness Document',
+    financial_model: 'Financial Readiness Document',
+    cap_table: 'Cap Table',
+    traction_metrics: 'Traction Metrics',
+    legal_company_docs: 'Legal Readiness Document',
+    incorporation_docs: 'Incorporation Docs',
+    customer_contracts_summaries: 'Customer and Contracts Summaries',
+    term_sheet_drafts: 'Term Sheet Drafts',
+}
 
 function formatFileSize(value: number | null): string {
     if (typeof value !== 'number' || Number.isNaN(value) || value <= 0) {
@@ -48,8 +61,7 @@ function formatFileSize(value: number | null): string {
 }
 
 function getDocumentTypeLabel(value: StartupDataRoomDocumentType): string {
-    const entry = DATA_ROOM_DOCUMENT_TYPE_OPTIONS.find((item) => item.value === value)
-    return entry?.label ?? value
+    return DATA_ROOM_DOCUMENT_TYPE_LABELS[value] ?? value
 }
 
 type DataRoomSectionProps = {
@@ -190,9 +202,9 @@ export default function DataRoomSection(input: DataRoomSectionProps) {
                         </div>
                         <div className={`rounded-2xl border p-4 ${input.mutedPanelClass}`}>
                             <p className={`text-[11px] font-black uppercase tracking-widest ${input.titleMutedClass}`}>Boundary</p>
-                            <p className={`mt-1 text-sm font-black ${input.textMainClass}`}>Isolated from Engine</p>
+                            <p className={`mt-1 text-sm font-black ${input.textMainClass}`}>Shared Readiness Source</p>
                             <p className={`mt-1 text-[11px] font-bold leading-relaxed ${input.textMutedClass}`}>
-                                These files do not influence your Startup Readiness score.
+                                Pitch, financial, and legal readiness checks now read from this document system.
                             </p>
                             <Link
                                 href="/workspace/settings?section=settings-startup-readiness"
@@ -249,7 +261,7 @@ export default function DataRoomSection(input: DataRoomSectionProps) {
                                         disabled={uploadDisabled}
                                         className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none shadow-sm transition-all focus:border-emerald-500/50 ${input.isLight ? 'border-slate-200 bg-white text-slate-900' : 'border-slate-700 bg-slate-950 text-slate-100'}`}
                                     >
-                                        {DATA_ROOM_DOCUMENT_TYPE_OPTIONS.map((option) => (
+                                        {DATA_ROOM_UPLOAD_DOCUMENT_TYPE_OPTIONS.map((option) => (
                                             <option key={option.value} value={option.value}>
                                                 {option.label}
                                             </option>
@@ -329,7 +341,7 @@ export default function DataRoomSection(input: DataRoomSectionProps) {
                                         <div className="flex items-center justify-between gap-2">
                                             <p className={`text-[12px] font-black uppercase tracking-tight truncate ${input.textMainClass}`}>{document.title}</p>
                                             <Badge variant="outline" className="h-4 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-tighter border-slate-200 text-slate-500">
-                                                {document.document_type.split('_').pop()}
+                                                {getDocumentTypeLabel(document.document_type)}
                                             </Badge>
                                         </div>
                                         <a
@@ -352,6 +364,17 @@ export default function DataRoomSection(input: DataRoomSectionProps) {
                                             {input.canEdit ? (
                                                 <form action={deleteAction}>
                                                     <input type="hidden" name="dataRoomDocumentId" value={document.id} />
+                                                    <input type="hidden" name="dataRoomDocumentUrl" value={document.file_url} />
+                                                    <input
+                                                        type="hidden"
+                                                        name="dataRoomDocumentStorageBucket"
+                                                        value={document.storage_bucket ?? ''}
+                                                    />
+                                                    <input
+                                                        type="hidden"
+                                                        name="dataRoomDocumentStorageObjectPath"
+                                                        value={document.storage_object_path ?? ''}
+                                                    />
                                                     <Button
                                                         type="submit"
                                                         variant="ghost"

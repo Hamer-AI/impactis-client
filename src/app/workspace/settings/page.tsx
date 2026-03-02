@@ -174,8 +174,8 @@ function getSectionPresentation(sectionId: string): {
 } {
     if (sectionId === 'settings-startup-readiness') {
         return {
-            title: 'Readiness Inputs & Score',
-            description: 'Maintain the structured profile and core files used to compute readiness and discovery eligibility.',
+            title: 'Startup Profile',
+            description: 'Maintain profile metadata here. Readiness documents are sourced from Investor Data Room files.',
             badgeVariant: 'warning',
             icon: Gauge,
         }
@@ -202,7 +202,7 @@ function getSectionPresentation(sectionId: string): {
     if (sectionId === 'settings-data-room') {
         return {
             title: 'Investor Data Room',
-            description: 'Centralize diligence documents for investor review. Data room files do not affect readiness scoring.',
+            description: 'Centralize diligence documents for investor review. Core readiness documents are now managed from the same document system.',
             badgeVariant: 'outline',
             icon: FolderLock,
         }
@@ -238,7 +238,7 @@ function getSectionPresentation(sectionId: string): {
     if (sectionId === 'settings-readiness-rules') {
         return {
             title: 'Readiness Qualification Rules',
-            description: 'Track rules that evaluate readiness inputs and control startup visibility and engagement.',
+            description: 'Discovery requires profile >= 70, readiness score >= 60, and required data-room documents uploaded.',
             badgeVariant: 'warning',
             icon: ClipboardList,
         }
@@ -368,7 +368,7 @@ export default async function WorkspaceSettingsPage({
         ? [
             { id: 'settings-identity', label: 'Organization Identity', icon: 'identity' },
             { id: 'settings-billing', label: 'Subscription & Billing', icon: 'billing' },
-            { id: 'settings-startup-readiness', label: 'Readiness Inputs & Score', icon: 'readiness' },
+            { id: 'settings-startup-readiness', label: 'Startup Profile', icon: 'readiness' },
             { id: 'settings-discovery', label: 'Discovery Post', icon: 'discovery' },
             { id: 'settings-data-room', label: 'Investor Data Room', icon: 'dataroom' },
             { id: 'settings-invites', label: 'Team Invites', icon: 'invites' },
@@ -728,10 +728,6 @@ export default async function WorkspaceSettingsPage({
                                 defaultOrganizationLogoUrl={membership.organization.logo_url ?? ''}
                                 defaultOrganizationIndustryTags={industryTags}
                                 defaultStartupWebsiteUrl={startupProfile?.website_url ?? ''}
-                                defaultStartupPitchDeckUrl={startupProfile?.pitch_deck_url ?? ''}
-                                defaultStartupPitchDeckMediaKind={startupProfile?.pitch_deck_media_kind ?? null}
-                                defaultStartupPitchDeckFileName={startupProfile?.pitch_deck_file_name ?? ''}
-                                defaultStartupPitchDeckFileSizeBytes={startupProfile?.pitch_deck_file_size_bytes ?? null}
                                 defaultStartupTeamOverview={startupProfile?.team_overview ?? ''}
                                 defaultStartupCompanyStage={startupProfile?.company_stage ?? ''}
                                 defaultStartupFoundingYear={startupProfile?.founding_year ?? null}
@@ -741,12 +737,6 @@ export default async function WorkspaceSettingsPage({
                                 defaultStartupTractionSummary={startupProfile?.traction_summary ?? ''}
                                 defaultStartupFinancialSummary={startupProfile?.financial_summary ?? ''}
                                 defaultStartupLegalSummary={startupProfile?.legal_summary ?? ''}
-                                defaultStartupFinancialDocUrl={startupProfile?.financial_doc_url ?? ''}
-                                defaultStartupFinancialDocFileName={startupProfile?.financial_doc_file_name ?? ''}
-                                defaultStartupFinancialDocFileSizeBytes={startupProfile?.financial_doc_file_size_bytes ?? null}
-                                defaultStartupLegalDocUrl={startupProfile?.legal_doc_url ?? ''}
-                                defaultStartupLegalDocFileName={startupProfile?.legal_doc_file_name ?? ''}
-                                defaultStartupLegalDocFileSizeBytes={startupProfile?.legal_doc_file_size_bytes ?? null}
                                 defaultInvestorThesis={investorThesis}
                                 defaultInvestorSectorTags={investorSectorTags}
                                 defaultInvestorCheckSizeMinUsd={investorCheckSizeMinUsd}
@@ -825,7 +815,6 @@ export default async function WorkspaceSettingsPage({
                             <ReadinessRulesSection
                                 startupReadiness={startupReadiness}
                                 readinessSectionLabelMap={readinessSectionLabelMap}
-                                toTitleCase={toTitleCase}
                                 isLight={isLight}
                                 labelClass={labelClass}
                                 textMainClass={textMainClass}

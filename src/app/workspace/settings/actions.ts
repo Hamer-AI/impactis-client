@@ -15,7 +15,6 @@ import {
 } from '@/modules/organizations'
 import {
     type StartupDataRoomDocumentType,
-    type StartupPitchDeckMediaKind,
     type StartupPostStatus,
 } from '@/modules/startups'
 import { WORKSPACE_IDENTITY_CACHE_TAG } from '@/modules/workspace'
@@ -47,8 +46,7 @@ const ALLOWED_ORGANIZATION_LOGO_MIME_TYPES = new Set([
     'image/gif',
     'image/svg+xml',
 ])
-const STARTUP_READINESS_ASSET_BUCKET = 'startup-readiness-assets'
-const MAX_STARTUP_READINESS_ASSET_SIZE_BYTES = 50 * 1024 * 1024
+const STARTUP_DATA_ROOM_ASSET_BUCKET = 'startup-data-room-assets'
 const MAX_STARTUP_DATA_ROOM_ASSET_SIZE_BYTES = 100 * 1024 * 1024
 const ALLOWED_STARTUP_PITCH_DECK_ASSET_MIME_TYPES = new Set([
     'application/pdf',
@@ -57,14 +55,6 @@ const ALLOWED_STARTUP_PITCH_DECK_ASSET_MIME_TYPES = new Set([
     'video/mp4',
     'video/webm',
     'video/quicktime',
-])
-const ALLOWED_STARTUP_READINESS_DOCUMENT_ASSET_MIME_TYPES = new Set([
-    'application/pdf',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/vnd.ms-excel',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'text/csv',
 ])
 const ALLOWED_STARTUP_DATA_ROOM_DOCUMENT_ASSET_MIME_TYPES = new Set([
     'application/pdf',
@@ -164,6 +154,14 @@ function normalizeStartupDataRoomDocumentType(value: FormDataEntryValue | null):
     }
 
     const normalized = value.trim().toLowerCase()
+    if (normalized === 'financial_doc') {
+        return 'financial_model'
+    }
+
+    if (normalized === 'legal_doc') {
+        return 'legal_company_docs'
+    }
+
     if (
         normalized === 'pitch_deck'
         || normalized === 'financial_model'
@@ -304,9 +302,13 @@ function buildOrganizationLogoObjectPath(orgId: string, file: File): string {
     return `${orgId}/logo-${crypto.randomUUID()}.${extension}`
 }
 
-function buildStartupReadinessAssetObjectPath(orgId: string, file: File): string {
+function buildStartupDataRoomAssetObjectPath(
+    orgId: string,
+    file: File,
+    documentType: StartupDataRoomDocumentType
+): string {
     const extension = resolveStartupReadinessAssetFileExtension(file)
-    return `${orgId}/pitch-deck-${crypto.randomUUID()}.${extension}`
+    return `${orgId}/data-room/${documentType}-${crypto.randomUUID()}.${extension}`
 }
 
 function extractOrganizationLogoObjectPath(publicUrl: string): string | null {
@@ -324,10 +326,10 @@ function extractOrganizationLogoObjectPath(publicUrl: string): string | null {
     }
 }
 
-function extractStartupReadinessAssetObjectPath(publicUrl: string): string | null {
+function extractStartupDataRoomAssetObjectPath(publicUrl: string): string | null {
     try {
         const url = new URL(publicUrl)
-        const prefix = `/storage/v1/object/public/${STARTUP_READINESS_ASSET_BUCKET}/`
+        const prefix = `/storage/v1/object/public/${STARTUP_DATA_ROOM_ASSET_BUCKET}/`
         if (!url.pathname.startsWith(prefix)) {
             return null
         }
@@ -356,115 +358,57 @@ async function removeOrganizationLogoObjectIfManaged(
     await supabase.storage.from(ORGANIZATION_LOGO_BUCKET).remove([objectPath])
 }
 
-function resolvePitchDeckMediaKindByMimeType(mimeType: string): StartupPitchDeckMediaKind {
-    return mimeType.startsWith('video/') ? 'video' : 'document'
-}
-
-async function uploadStartupReadinessAsset(input: {
-    accessToken: string
-    orgId: string
-    file: File
-    assetType: 'pitch_deck' | 'financial_doc' | 'legal_doc'
-}): Promise<{ publicUrl: string | null }> {
-    const uploadConfig = await apiRequest<{
-        success: boolean
-        message: string | null
-        uploadUrl: string | null
-        publicUrl: string | null
-    }>({
-        path: '/files/startups/readiness/upload-url',
-        method: 'POST',
-        accessToken: input.accessToken,
-        body: {
-            orgId: input.orgId,
-            assetType: input.assetType,
-            fileName: input.file.name,
-            contentType: input.file.type,
-            contentLength: input.file.size,
-        },
-    })
-
-    const payload = uploadConfig
-    if (!payload?.success || !payload.uploadUrl) {
-        throw new Error(payload?.message ?? 'Unable to prepare readiness asset upload right now.')
-    }
-
-    const uploadResponse = await fetch(payload.uploadUrl, {
-        method: 'PUT',
-        headers: {
-            'content-type': input.file.type,
-        },
-        body: input.file,
-    })
-    if (!uploadResponse.ok) {
-        throw new Error('Readiness asset upload failed. Please try again.')
-    }
-
-    return {
-        publicUrl: payload.publicUrl ?? null,
-    }
-}
-
 async function uploadStartupDataRoomAsset(input: {
-    accessToken: string
+    supabase: Awaited<ReturnType<typeof createClient>>
     orgId: string
     documentType: StartupDataRoomDocumentType
     file: File
-}): Promise<{ publicUrl: string | null }> {
-    const uploadConfig = await apiRequest<{
-        success: boolean
-        message: string | null
-        uploadUrl: string | null
-        publicUrl: string | null
-    }>({
-        path: '/files/startups/data-room/upload-url',
-        method: 'POST',
-        accessToken: input.accessToken,
-        body: {
-            orgId: input.orgId,
-            documentType: input.documentType,
-            fileName: input.file.name,
+}): Promise<{ publicUrl: string | null; storageBucket: string; storageObjectPath: string }> {
+    const objectPath = buildStartupDataRoomAssetObjectPath(input.orgId, input.file, input.documentType)
+    const { error: uploadError } = await input.supabase.storage
+        .from(STARTUP_DATA_ROOM_ASSET_BUCKET)
+        .upload(objectPath, input.file, {
+            cacheControl: '3600',
+            upsert: false,
             contentType: input.file.type,
-            contentLength: input.file.size,
-        },
-    })
-
-    const payload = uploadConfig
-    if (!payload?.success || !payload.uploadUrl) {
-        throw new Error(payload?.message ?? 'Unable to prepare data room upload right now.')
+        })
+    if (uploadError) {
+        throw new Error(`Data room upload failed: ${uploadError.message}`)
     }
 
-    const uploadResponse = await fetch(payload.uploadUrl, {
-        method: 'PUT',
-        headers: {
-            'content-type': input.file.type,
-        },
-        body: input.file,
-    })
-    if (!uploadResponse.ok) {
-        throw new Error('Data room upload failed. Please try again.')
-    }
+    const {
+        data: { publicUrl },
+    } = input.supabase.storage.from(STARTUP_DATA_ROOM_ASSET_BUCKET).getPublicUrl(objectPath)
 
     return {
-        publicUrl: payload.publicUrl ?? null,
+        publicUrl: normalizeText(publicUrl),
+        storageBucket: STARTUP_DATA_ROOM_ASSET_BUCKET,
+        storageObjectPath: objectPath,
     }
 }
 
-async function removeStartupReadinessAssetIfManaged(
+async function removeStartupDataRoomAssetIfManaged(
     supabase: Awaited<ReturnType<typeof createClient>>,
-    publicUrl: string | null
+    input: {
+        publicUrl: string | null
+        storageBucket?: string | null
+        storageObjectPath?: string | null
+    }
 ): Promise<void> {
-    const normalizedUrl = normalizeText(publicUrl)
-    if (!normalizedUrl) {
+    const storageBucket = typeof input.storageBucket === 'string' ? input.storageBucket.trim() : null
+    const storageObjectPath = typeof input.storageObjectPath === 'string' ? input.storageObjectPath.trim() : null
+    if (storageBucket === STARTUP_DATA_ROOM_ASSET_BUCKET && storageObjectPath) {
+        await supabase.storage.from(STARTUP_DATA_ROOM_ASSET_BUCKET).remove([storageObjectPath])
         return
     }
 
-    const objectPath = extractStartupReadinessAssetObjectPath(normalizedUrl)
+    const normalizedUrl = normalizeText(input.publicUrl)
+    const objectPath = normalizedUrl ? extractStartupDataRoomAssetObjectPath(normalizedUrl) : null
     if (!objectPath) {
         return
     }
 
-    await supabase.storage.from(STARTUP_READINESS_ASSET_BUCKET).remove([objectPath])
+    await supabase.storage.from(STARTUP_DATA_ROOM_ASSET_BUCKET).remove([objectPath])
 }
 
 function resolveInviteBaseUrl(): string {
@@ -722,12 +666,6 @@ export async function updateStartupReadinessSectionAction(
         }
 
         const startupWebsiteUrl = normalizeText(formData.get('startupWebsiteUrl'))
-        const startupPitchDeckCurrentUrl = normalizeText(formData.get('startupPitchDeckCurrentUrl'))
-        const startupPitchDeckCurrentMediaKindRaw = normalizeText(formData.get('startupPitchDeckCurrentMediaKind'))
-        const startupPitchDeckCurrentFileName = normalizeText(formData.get('startupPitchDeckCurrentFileName'))
-        const startupPitchDeckCurrentFileSizeBytes = normalizeInteger(formData.get('startupPitchDeckCurrentFileSizeBytes'))
-        const startupPitchDeckFile = normalizeUploadedFile(formData.get('startupPitchDeckFile'))
-        const startupPitchDeckRemove = isChecked(formData.get('startupPitchDeckRemove'))
         const startupTeamOverview = normalizeText(formData.get('startupTeamOverview'))
         const startupCompanyStage = normalizeText(formData.get('startupCompanyStage'))
         const startupFoundingYear = normalizeInteger(formData.get('startupFoundingYear'))
@@ -738,62 +676,8 @@ export async function updateStartupReadinessSectionAction(
         const startupFinancialSummary = normalizeText(formData.get('startupFinancialSummary'))
         const startupLegalSummary = normalizeText(formData.get('startupLegalSummary'))
 
-        const startupFinancialDocCurrentUrl = normalizeText(formData.get('startupFinancialDocCurrentUrl'))
-        const startupFinancialDocCurrentFileName = normalizeText(formData.get('startupFinancialDocCurrentFileName'))
-        const startupFinancialDocCurrentFileSizeBytes = normalizeInteger(formData.get('startupFinancialDocCurrentFileSizeBytes'))
-        const startupFinancialDocFile = normalizeUploadedFile(formData.get('startupFinancialDocFile'))
-        const startupFinancialDocRemove = isChecked(formData.get('startupFinancialDocRemove'))
-
-        const startupLegalDocCurrentUrl = normalizeText(formData.get('startupLegalDocCurrentUrl'))
-        const startupLegalDocCurrentFileName = normalizeText(formData.get('startupLegalDocCurrentFileName'))
-        const startupLegalDocCurrentFileSizeBytes = normalizeInteger(formData.get('startupLegalDocCurrentFileSizeBytes'))
-        const startupLegalDocFile = normalizeUploadedFile(formData.get('startupLegalDocFile'))
-        const startupLegalDocRemove = isChecked(formData.get('startupLegalDocRemove'))
-
         if (startupWebsiteUrl && !isValidHttpUrl(startupWebsiteUrl)) {
             return { error: 'Website URL must be a valid http/https link.', success: null }
-        }
-
-        if (startupPitchDeckCurrentUrl && !isValidHttpUrl(startupPitchDeckCurrentUrl)) {
-            return { error: 'Current pitch deck asset URL is invalid.', success: null }
-        }
-
-        if (startupFinancialDocCurrentUrl && !isValidHttpUrl(startupFinancialDocCurrentUrl)) {
-            return { error: 'Current financial document URL is invalid.', success: null }
-        }
-
-        if (startupLegalDocCurrentUrl && !isValidHttpUrl(startupLegalDocCurrentUrl)) {
-            return { error: 'Current legal document URL is invalid.', success: null }
-        }
-
-        if (startupPitchDeckFile) {
-            if (startupPitchDeckFile.size > MAX_STARTUP_READINESS_ASSET_SIZE_BYTES) {
-                return { error: 'Pitch deck asset must be 50MB or smaller.', success: null }
-            }
-
-            if (!ALLOWED_STARTUP_PITCH_DECK_ASSET_MIME_TYPES.has(startupPitchDeckFile.type)) {
-                return { error: 'Pitch deck must be PDF/PPT/PPTX or MP4/WEBM/MOV.', success: null }
-            }
-        }
-
-        if (startupFinancialDocFile) {
-            if (startupFinancialDocFile.size > MAX_STARTUP_READINESS_ASSET_SIZE_BYTES) {
-                return { error: 'Financial document must be 50MB or smaller.', success: null }
-            }
-
-            if (!ALLOWED_STARTUP_READINESS_DOCUMENT_ASSET_MIME_TYPES.has(startupFinancialDocFile.type)) {
-                return { error: 'Financial document must be PDF, DOC/DOCX, XLS/XLSX, or CSV.', success: null }
-            }
-        }
-
-        if (startupLegalDocFile) {
-            if (startupLegalDocFile.size > MAX_STARTUP_READINESS_ASSET_SIZE_BYTES) {
-                return { error: 'Legal document must be 50MB or smaller.', success: null }
-            }
-
-            if (!ALLOWED_STARTUP_READINESS_DOCUMENT_ASSET_MIME_TYPES.has(startupLegalDocFile.type)) {
-                return { error: 'Legal document must be PDF, DOC/DOCX, XLS/XLSX, or CSV.', success: null }
-            }
         }
 
         if (startupFoundingYear && (startupFoundingYear < 1900 || startupFoundingYear > 2100)) {
@@ -804,41 +688,6 @@ export async function updateStartupReadinessSectionAction(
             return { error: 'Team size must be at least 1.', success: null }
         }
 
-        let startupPitchDeckUrl = startupPitchDeckCurrentUrl
-        let startupPitchDeckMediaKind: StartupPitchDeckMediaKind | null =
-            startupPitchDeckCurrentMediaKindRaw === 'video'
-                ? 'video'
-                : startupPitchDeckCurrentMediaKindRaw === 'document'
-                    ? 'document'
-                    : null
-        let startupPitchDeckFileName = startupPitchDeckCurrentFileName
-        let startupPitchDeckFileSizeBytes = startupPitchDeckCurrentFileSizeBytes
-
-        if (startupPitchDeckRemove) {
-            startupPitchDeckUrl = null
-            startupPitchDeckMediaKind = null
-            startupPitchDeckFileName = null
-            startupPitchDeckFileSizeBytes = null
-        }
-
-        let startupFinancialDocUrl = startupFinancialDocCurrentUrl
-        let startupFinancialDocFileName = startupFinancialDocCurrentFileName
-        let startupFinancialDocFileSizeBytes = startupFinancialDocCurrentFileSizeBytes
-        if (startupFinancialDocRemove) {
-            startupFinancialDocUrl = null
-            startupFinancialDocFileName = null
-            startupFinancialDocFileSizeBytes = null
-        }
-
-        let startupLegalDocUrl = startupLegalDocCurrentUrl
-        let startupLegalDocFileName = startupLegalDocCurrentFileName
-        let startupLegalDocFileSizeBytes = startupLegalDocCurrentFileSizeBytes
-        if (startupLegalDocRemove) {
-            startupLegalDocUrl = null
-            startupLegalDocFileName = null
-            startupLegalDocFileSizeBytes = null
-        }
-
         const {
             data: { session },
         } = await supabase.auth.getSession()
@@ -847,75 +696,12 @@ export async function updateStartupReadinessSectionAction(
             return { error: 'Your session has expired. Please log in again.', success: null }
         }
 
-        if (startupPitchDeckFile) {
-            try {
-                const payload = await uploadStartupReadinessAsset({
-                    accessToken,
-                    orgId: membership.org_id,
-                    file: startupPitchDeckFile,
-                    assetType: 'pitch_deck',
-                })
-
-                startupPitchDeckUrl = payload.publicUrl
-                startupPitchDeckMediaKind = resolvePitchDeckMediaKindByMimeType(startupPitchDeckFile.type)
-                startupPitchDeckFileName = normalizeText(startupPitchDeckFile.name)
-                startupPitchDeckFileSizeBytes = startupPitchDeckFile.size
-            } catch (uploadError) {
-                const message = uploadError instanceof Error
-                    ? uploadError.message
-                    : 'Pitch deck upload failed. Please try again.'
-                return { error: message, success: null }
-            }
-        }
-
-        if (startupFinancialDocFile) {
-            try {
-                const payload = await uploadStartupReadinessAsset({
-                    accessToken,
-                    orgId: membership.org_id,
-                    file: startupFinancialDocFile,
-                    assetType: 'financial_doc',
-                })
-                startupFinancialDocUrl = payload.publicUrl
-                startupFinancialDocFileName = normalizeText(startupFinancialDocFile.name)
-                startupFinancialDocFileSizeBytes = startupFinancialDocFile.size
-            } catch (uploadError) {
-                const message = uploadError instanceof Error
-                    ? uploadError.message
-                    : 'Financial document upload failed. Please try again.'
-                return { error: message, success: null }
-            }
-        }
-
-        if (startupLegalDocFile) {
-            try {
-                const payload = await uploadStartupReadinessAsset({
-                    accessToken,
-                    orgId: membership.org_id,
-                    file: startupLegalDocFile,
-                    assetType: 'legal_doc',
-                })
-                startupLegalDocUrl = payload.publicUrl
-                startupLegalDocFileName = normalizeText(startupLegalDocFile.name)
-                startupLegalDocFileSizeBytes = startupLegalDocFile.size
-            } catch (uploadError) {
-                const message = uploadError instanceof Error
-                    ? uploadError.message
-                    : 'Legal document upload failed. Please try again.'
-                return { error: message, success: null }
-            }
-        }
-
         const profileResult = await apiRequest<{ success: boolean; message: string | null }>({
             path: '/startups/profile',
             method: 'PATCH',
             accessToken,
             body: {
                 websiteUrl: startupWebsiteUrl,
-                pitchDeckUrl: startupPitchDeckUrl,
-                pitchDeckMediaKind: startupPitchDeckMediaKind,
-                pitchDeckFileName: startupPitchDeckFileName,
-                pitchDeckFileSizeBytes: startupPitchDeckFileSizeBytes,
                 teamOverview: startupTeamOverview,
                 companyStage: startupCompanyStage,
                 foundingYear: startupFoundingYear,
@@ -925,12 +711,6 @@ export async function updateStartupReadinessSectionAction(
                 tractionSummary: startupTractionSummary,
                 financialSummary: startupFinancialSummary,
                 legalSummary: startupLegalSummary,
-                financialDocUrl: startupFinancialDocUrl,
-                financialDocFileName: startupFinancialDocFileName,
-                financialDocFileSizeBytes: startupFinancialDocFileSizeBytes,
-                legalDocUrl: startupLegalDocUrl,
-                legalDocFileName: startupLegalDocFileName,
-                legalDocFileSizeBytes: startupLegalDocFileSizeBytes,
             },
         })
 
@@ -939,23 +719,11 @@ export async function updateStartupReadinessSectionAction(
             return { error: message, success: null }
         }
 
-        if (startupPitchDeckCurrentUrl && (startupPitchDeckRemove || startupPitchDeckFile)) {
-            await removeStartupReadinessAssetIfManaged(supabase, startupPitchDeckCurrentUrl)
-        }
-
-        if (startupFinancialDocCurrentUrl && (startupFinancialDocRemove || startupFinancialDocFile)) {
-            await removeStartupReadinessAssetIfManaged(supabase, startupFinancialDocCurrentUrl)
-        }
-
-        if (startupLegalDocCurrentUrl && (startupLegalDocRemove || startupLegalDocFile)) {
-            await removeStartupReadinessAssetIfManaged(supabase, startupLegalDocCurrentUrl)
-        }
-
         revalidatePath('/workspace')
         revalidatePath('/workspace/settings')
         revalidateTag(WORKSPACE_IDENTITY_CACHE_TAG, 'max')
 
-        return { error: null, success: 'Startup readiness fields updated.' }
+        return { error: null, success: 'Startup readiness profile updated.' }
     } catch (error) {
         const message = error instanceof Error ? error.message : 'Unable to update startup readiness right now.'
         logServerTelemetry({
@@ -1115,7 +883,7 @@ export async function upsertStartupDataRoomDocumentSectionAction(
         }
 
         const uploadPayload = await uploadStartupDataRoomAsset({
-            accessToken,
+            supabase,
             orgId: membership.org_id,
             documentType,
             file,
@@ -1134,6 +902,8 @@ export async function upsertStartupDataRoomDocumentSectionAction(
                 title,
                 summary,
                 fileUrl: publicUrl,
+                storageBucket: uploadPayload.storageBucket,
+                storageObjectPath: uploadPayload.storageObjectPath,
                 fileName: normalizeText(file.name),
                 fileSizeBytes: file.size,
                 contentType: normalizeText(file.type),
@@ -1185,6 +955,9 @@ export async function deleteStartupDataRoomDocumentSectionAction(
         }
 
         const documentId = normalizeText(formData.get('dataRoomDocumentId'))
+        const documentUrl = normalizeText(formData.get('dataRoomDocumentUrl'))
+        const documentStorageBucket = normalizeText(formData.get('dataRoomDocumentStorageBucket'))
+        const documentStorageObjectPath = normalizeText(formData.get('dataRoomDocumentStorageObjectPath'))
         if (!documentId) {
             return { error: 'Data room document id is required.', success: null }
         }
@@ -1205,6 +978,12 @@ export async function deleteStartupDataRoomDocumentSectionAction(
         if (!mutation?.success) {
             return { error: mutation?.message ?? 'Unable to remove data room document right now.', success: null }
         }
+
+        await removeStartupDataRoomAssetIfManaged(supabase, {
+            publicUrl: documentUrl,
+            storageBucket: documentStorageBucket,
+            storageObjectPath: documentStorageObjectPath,
+        })
 
         revalidatePath('/workspace')
         revalidatePath('/workspace/settings')

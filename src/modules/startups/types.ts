@@ -1,6 +1,8 @@
 export type StartupPostStatus = 'draft' | 'published'
 export type StartupDataRoomDocumentType =
     | 'pitch_deck'
+    | 'financial_doc'
+    | 'legal_doc'
     | 'financial_model'
     | 'cap_table'
     | 'traction_metrics'
@@ -109,6 +111,8 @@ export type StartupDataRoomDocument = {
     document_type: StartupDataRoomDocumentType
     title: string
     file_url: string
+    storage_bucket: string | null
+    storage_object_path: string | null
     file_name: string | null
     file_size_bytes: number | null
     content_type: string | null

@@ -52,12 +52,12 @@ const ICON_MAP: Record<string, typeof Building2> = {
 const DESCRIPTION_MAP: Record<string, string> = {
     'settings-identity': 'Profile, logo & categories',
     'settings-billing': 'Plans, invoices & usage',
-    'settings-startup-readiness': 'Score & eligibility inputs',
+    'settings-startup-readiness': 'Startup profile metadata',
     'settings-discovery': 'Visibility & feed listing',
     'settings-data-room': 'Documents for investors',
     'settings-invites': 'Invite links & members',
     'settings-permissions': 'Roles & access control',
-    'settings-readiness-rules': 'Qualification criteria',
+    'settings-readiness-rules': 'Scoring gates & blockers',
     'settings-team-access': 'Collaboration settings',
 }
 
