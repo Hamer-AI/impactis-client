@@ -329,71 +329,109 @@ export default function DataRoomSection(input: DataRoomSectionProps) {
                         Document Library
                     </label>
                     <p className={`text-sm font-medium leading-relaxed ${input.textMutedClass}`}>
-                        Manage your securely stored diligence files.
+                        Curated collection of investor-ready files. Each upload keeps a single, current version per document type.
                     </p>
                 </div>
                 <div className="md:col-span-2">
                     {input.documents.length > 0 ? (
-                        <div className="grid gap-4 sm:grid-cols-2 max-w-xl">
+                        <div className="flex flex-col gap-3 max-w-2xl">
                             {input.documents.map((document) => (
-                                <div key={document.id} className={`rounded-2xl border p-4 transition-all hover:shadow-md ${input.mutedPanelClass}`}>
-                                    <div className="flex flex-col gap-2">
-                                        <div className="flex items-center justify-between gap-2">
-                                            <p className={`text-[12px] font-black uppercase tracking-tight truncate ${input.textMainClass}`}>{document.title}</p>
-                                            <Badge variant="outline" className="h-4 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-tighter border-slate-200 text-slate-500">
-                                                {getDocumentTypeLabel(document.document_type)}
-                                            </Badge>
-                                        </div>
-                                        <a
-                                            href={document.file_url}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="block truncate text-xs font-bold text-emerald-500 hover:underline"
+                                <div
+                                    key={document.id}
+                                    className={`group flex items-stretch justify-between gap-3 rounded-2xl border px-4 py-3 transition-all hover:-translate-y-0.5 hover:shadow-md ${input.mutedPanelClass}`}
+                                >
+                                    <div className="flex flex-1 items-start gap-3 overflow-hidden">
+                                        <div
+                                            className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border text-emerald-500 ${input.isLight ? 'border-slate-200 bg-white' : 'border-slate-700 bg-slate-950'}`}
                                         >
-                                            {document.file_name || 'Open resource'}
-                                        </a>
-                                        <p className={`text-[11px] font-bold ${input.textMutedClass}`}>
-                                            {formatFileSize(document.file_size_bytes)}
-                                            {document.content_type ? ` · ${document.content_type.split('/').pop()?.toUpperCase()}` : ''}
-                                        </p>
-                                        {document.summary ? (
-                                            <p className={`mt-1 text-[11px] font-medium leading-relaxed line-clamp-2 ${input.textMutedClass}`}>{document.summary}</p>
-                                        ) : null}
-                                        <div className="mt-2 pt-2 border-t border-slate-200/5 flex items-center justify-between gap-2">
-                                            <p className={`text-[10px] font-bold text-slate-400 capitalize`}>Updated {new Date(document.updated_at).toLocaleDateString()}</p>
-                                            {input.canEdit ? (
-                                                <form action={deleteAction}>
-                                                    <input type="hidden" name="dataRoomDocumentId" value={document.id} />
-                                                    <input type="hidden" name="dataRoomDocumentUrl" value={document.file_url} />
-                                                    <input
-                                                        type="hidden"
-                                                        name="dataRoomDocumentStorageBucket"
-                                                        value={document.storage_bucket ?? ''}
-                                                    />
-                                                    <input
-                                                        type="hidden"
-                                                        name="dataRoomDocumentStorageObjectPath"
-                                                        value={document.storage_object_path ?? ''}
-                                                    />
-                                                    <Button
-                                                        type="submit"
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        disabled={isDeletePending}
-                                                        className="h-6 px-2 text-[10px] font-black uppercase tracking-widest text-rose-500 hover:bg-rose-50 hover:text-rose-600"
-                                                    >
-                                                        {isDeletePending ? '...' : 'Remove'}
-                                                    </Button>
-                                                </form>
+                                            <FolderLock className="h-4 w-4" />
+                                        </div>
+                                        <div className="min-w-0 space-y-1">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <p
+                                                    className={`truncate text-[13px] font-semibold ${input.textMainClass}`}
+                                                    title={document.title}
+                                                >
+                                                    {document.title || getDocumentTypeLabel(document.document_type)}
+                                                </p>
+                                                <Badge
+                                                    variant="outline"
+                                                    className="shrink-0 rounded-full border-slate-200 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-slate-500"
+                                                >
+                                                    {getDocumentTypeLabel(document.document_type)}
+                                                </Badge>
+                                            </div>
+                                            <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                                                <a
+                                                    href={document.file_url}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="max-w-[220px] truncate font-semibold text-emerald-500 hover:underline"
+                                                >
+                                                    {document.file_name || 'Open document'}
+                                                </a>
+                                                <span className="text-slate-400">•</span>
+                                                <span className={input.textMutedClass}>
+                                                    {formatFileSize(document.file_size_bytes)}
+                                                    {document.content_type
+                                                        ? ` · ${document.content_type.split('/').pop()?.toUpperCase()}`
+                                                        : ''}
+                                                </span>
+                                                <span className="text-slate-400">•</span>
+                                                <span className="text-[10px] font-medium text-slate-400">
+                                                    Updated {new Date(document.updated_at).toLocaleDateString()}
+                                                </span>
+                                            </div>
+                                            {document.summary ? (
+                                                <p
+                                                    className={`line-clamp-2 text-[11px] font-medium leading-relaxed ${input.textMutedClass}`}
+                                                >
+                                                    {document.summary}
+                                                </p>
                                             ) : null}
                                         </div>
                                     </div>
+
+                                    {input.canEdit ? (
+                                        <form action={deleteAction} className="flex items-center shrink-0">
+                                            <input type="hidden" name="dataRoomDocumentId" value={document.id} />
+                                            <input type="hidden" name="dataRoomDocumentUrl" value={document.file_url} />
+                                            <input
+                                                type="hidden"
+                                                name="dataRoomDocumentStorageBucket"
+                                                value={document.storage_bucket ?? ''}
+                                            />
+                                            <input
+                                                type="hidden"
+                                                name="dataRoomDocumentStorageObjectPath"
+                                                value={document.storage_object_path ?? ''}
+                                            />
+                                            <Button
+                                                type="submit"
+                                                variant="ghost"
+                                                size="sm"
+                                                disabled={isDeletePending}
+                                                className="h-7 px-2 text-[10px] font-black uppercase tracking-widest text-rose-500 hover:bg-rose-50 hover:text-rose-600"
+                                            >
+                                                {isDeletePending ? '...' : 'Remove'}
+                                            </Button>
+                                        </form>
+                                    ) : null}
                                 </div>
                             ))}
                         </div>
                     ) : (
-                        <div className={`rounded-2xl border border-dashed p-10 text-center max-w-xl ${input.textMutedClass}`}>
-                            <p className="text-sm font-bold italic">No documents currently archived in the Data Room.</p>
+                        <div
+                            className={`flex max-w-2xl items-center justify-between rounded-2xl border border-dashed px-5 py-6 ${input.mutedPanelClass}`}
+                        >
+                            <div className="space-y-1">
+                                <p className="text-sm font-bold">No documents in your Data Room yet.</p>
+                                <p className={`text-[11px] font-medium ${input.textMutedClass}`}>
+                                    Start by uploading your pitch deck, financials, and key legal docs so investors can review
+                                    in one place.
+                                </p>
+                            </div>
+                            <UploadCloud className="hidden h-6 w-6 text-slate-300 sm:block" />
                         </div>
                     )}
                 </div>
