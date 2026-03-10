@@ -1,8 +1,8 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
 import { apiRequest } from '@/lib/api/rest-client'
+import { getBetterAuthToken } from '@/lib/better-auth-token'
 
 export type AcceptOrganizationInviteActionState = {
     error: string | null
@@ -22,18 +22,6 @@ export async function acceptOrganizationInviteAction(
     _previousState: AcceptOrganizationInviteActionState,
     formData: FormData
 ): Promise<AcceptOrganizationInviteActionState> {
-    const supabase = await createClient()
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-        return {
-            error: 'Please sign in before accepting this invite.',
-            success: null,
-        }
-    }
-
     const inviteToken = normalizeText(formData.get('inviteToken'))
     if (!inviteToken) {
         return {
@@ -42,10 +30,7 @@ export async function acceptOrganizationInviteAction(
         }
     }
 
-    const {
-        data: { session },
-    } = await supabase.auth.getSession()
-    const accessToken = session?.access_token ?? null
+    const accessToken = await getBetterAuthToken()
     if (!accessToken) {
         return {
             error: 'Please sign in before accepting this invite.',

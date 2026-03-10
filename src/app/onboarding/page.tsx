@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { headers } from 'next/headers'
+import { auth } from '@/lib/auth'
 import { getPostAuthRedirectPath } from '@/modules/auth'
 import {
     hasOrganizationMembershipForUser,
@@ -34,16 +35,17 @@ function normalizeTextArray(value: unknown): string[] {
 }
 
 export default async function OnboardingPage() {
-    const supabase = await createClient()
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
+    const session = await auth.api.getSession({
+        headers: await headers(),
+    })
 
-    if (!user) {
+    if (!session) {
         redirect('/auth/login')
     }
 
-    const hasMembership = await hasOrganizationMembershipForUser(supabase, user, {
+    const user = session.user as any
+
+    const hasMembership = await hasOrganizationMembershipForUser(null as any, user, {
         failOpenOnRequestError: true,
     })
     if (hasMembership) {

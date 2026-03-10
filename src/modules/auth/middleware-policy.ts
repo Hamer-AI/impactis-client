@@ -1,13 +1,10 @@
-import type { User } from '@supabase/supabase-js'
+type User = {
+    id: string
+    email?: string | null
+    last_sign_in_at?: string | null
+}
 import { isOnboardingPath } from '@/modules/onboarding'
-import {
-    getAdminPath,
-    getPostAuthRedirectPath,
-    isAdminPath,
-    isWorkspacePath,
-    isAuthEntryPath,
-    isPublicPath,
-} from './routing'
+import { getPostAuthRedirectPath, isWorkspacePath, isAuthEntryPath, isPublicPath } from './routing'
 
 type MiddlewareContext = {
     pathname: string
@@ -33,22 +30,6 @@ export function decideMiddlewareNavigation({
     }
 
     if (!user) {
-        return { type: 'allow' }
-    }
-
-    if (isAdminPath(pathname)) {
-        if (isPlatformAdmin) {
-            return { type: 'allow' }
-        }
-
-        return { type: 'redirect', destination: getPostAuthRedirectPath(hasOrganizationMembership) }
-    }
-
-    if (isPlatformAdmin) {
-        if (isOnboardingPath(pathname) || isAuthEntryPath(pathname)) {
-            return { type: 'redirect', destination: getAdminPath() }
-        }
-
         return { type: 'allow' }
     }
 

@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { mapLoginErrorMessage, resolvePostLoginRedirect, sanitizeNextPath } from '@/modules/auth'
+import { authClient } from '@/lib/auth-client'
+import { mapLoginErrorMessage, sanitizeNextPath } from '@/modules/auth'
 import TurnstileWidget from '@/components/auth/TurnstileWidget'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -20,7 +20,6 @@ export default function LoginPage() {
     const [isLoading, setIsLoading] = useState(false)
     const [nextPath, setNextPath] = useState<string | null>(null)
     const router = useRouter()
-    const supabase = useMemo(() => createClient(), [])
 
     useEffect(() => {
         const query = new URLSearchParams(window.location.search)
@@ -31,18 +30,12 @@ export default function LoginPage() {
         let isCancelled = false
 
         async function redirectIfAuthenticated() {
-            const {
-                data: { session },
-            } = await supabase.auth.getSession()
-
-            if (!session?.user || isCancelled) {
-                return
-            }
-
-            const queryNextPath = sanitizeNextPath(new URLSearchParams(window.location.search).get('next'))
-            const redirectPath = queryNextPath ?? await resolvePostLoginRedirect(supabase)
-            if (!isCancelled) {
+            const { data: betterAuthSession } = await authClient.getSession()
+            if (betterAuthSession?.user && !isCancelled) {
+                const queryNextPath = sanitizeNextPath(new URLSearchParams(window.location.search).get('next'))
+                const redirectPath = queryNextPath ?? '/workspace'
                 router.replace(redirectPath)
+                return
             }
         }
 
@@ -50,7 +43,7 @@ export default function LoginPage() {
         return () => {
             isCancelled = true
         }
-    }, [router, supabase])
+    }, [router])
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -64,23 +57,28 @@ export default function LoginPage() {
         setIsLoading(true)
 
         try {
-            const { error } = await supabase.auth.signInWithPassword({
+            const { data: betterAuthData, error: betterAuthError } = await authClient.signIn.email({
                 email: trimmedEmail,
                 password,
-                options: {
-                    captchaToken,
+                callbackURL: nextPath ?? '/workspace',
+                rememberMe: true,
+                fetchOptions: {
+                    headers: {
+                        'x-captcha-response': captchaToken ?? '',
+                    },
                 },
             })
 
-            if (error) {
-                toast.error(mapLoginErrorMessage(error))
+            if (betterAuthError || !betterAuthData) {
+                toast.error(mapLoginErrorMessage(betterAuthError ?? { message: 'Unable to sign in', code: 'invalid_credentials' } as any))
                 setCaptchaResetSignal((current) => current + 1)
-            } else {
-                toast.success('Successfully logged in!')
-                const queryNextPath = sanitizeNextPath(new URLSearchParams(window.location.search).get('next'))
-                const redirectPath = nextPath ?? queryNextPath ?? await resolvePostLoginRedirect(supabase)
-                router.push(redirectPath)
+                return
             }
+
+            toast.success('Successfully logged in!')
+            const queryNextPath = sanitizeNextPath(new URLSearchParams(window.location.search).get('next'))
+            const redirectPath = nextPath ?? queryNextPath ?? '/workspace'
+            router.push(redirectPath)
         } catch (err) {
             console.error('Unexpected auth catch:', err)
             toast.error('An unexpected error occurred')

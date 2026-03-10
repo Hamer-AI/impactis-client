@@ -1,8 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { getResetPasswordEmailRedirectUrl } from '@/modules/auth'
+import { authClient } from '@/lib/auth-client'
 import TurnstileWidget from '@/components/auth/TurnstileWidget'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -15,7 +14,6 @@ export default function ResetPasswordPage() {
     const [captchaResetSignal, setCaptchaResetSignal] = useState(0)
     const [isLoading, setIsLoading] = useState(false)
     const [isSent, setIsSent] = useState(false)
-    const supabase = createClient()
 
     const handleReset = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -28,18 +26,24 @@ export default function ResetPasswordPage() {
         setIsLoading(true)
 
         try {
-            const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                redirectTo: getResetPasswordEmailRedirectUrl(window.location.origin),
-                captchaToken,
+            const { error } = await authClient.requestPasswordReset({
+                email,
+                redirectTo: `${window.location.origin}/auth/update-password`,
+                fetchOptions: {
+                    headers: {
+                        'x-captcha-response': captchaToken ?? '',
+                    },
+                },
             })
 
             if (error) {
-                toast.error(error.message)
+                toast.error(error.message ?? 'Unable to send reset link.')
                 setCaptchaResetSignal((current) => current + 1)
-            } else {
-                toast.success('Reset link sent to your email!')
-                setIsSent(true)
+                return
             }
+
+            toast.success('Reset link sent to your email!')
+            setIsSent(true)
         } catch {
             toast.error('An unexpected error occurred')
         } finally {

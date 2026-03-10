@@ -1,6 +1,8 @@
-import type { User } from '@supabase/supabase-js'
-
-const ADMIN_PATH = '/admin'
+type User = {
+    id: string
+    email?: string | null
+    last_sign_in_at?: string | null
+}
 
 function getConfiguredAdminEmails(): Set<string> {
     const raw = process.env.ADMIN_EMAILS ?? ''
@@ -10,10 +12,6 @@ function getConfiguredAdminEmails(): Set<string> {
         .filter((value) => value.length > 0)
 
     return new Set(emails)
-}
-
-export function getAdminPath(): string {
-    return ADMIN_PATH
 }
 
 export function isPlatformAdminEmail(email: string | null | undefined): boolean {

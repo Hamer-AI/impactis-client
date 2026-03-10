@@ -1,5 +1,11 @@
-import type { SupabaseClient, User } from '@supabase/supabase-js'
+type SupabaseClient = unknown
+type User = {
+    id: string
+    email?: string | null
+    last_sign_in_at?: string | null
+}
 import { apiRequest } from '@/lib/api/rest-client'
+import { getBetterAuthToken } from '@/lib/better-auth-token'
 import type {
     OrganizationCapability,
     OrganizationCapabilityGateResult,
@@ -122,27 +128,8 @@ type MembershipCheckOptions = {
     throwOnRequestError?: boolean
 }
 
-async function getAccessToken(supabase: SupabaseClient): Promise<string | null> {
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) {
-        return null
-    }
-
-    const {
-        data: { session },
-    } = await supabase.auth.getSession()
-    if (session?.access_token) {
-        return session.access_token
-    }
-
-    const { data, error } = await supabase.auth.refreshSession()
-    if (error) {
-        return null
-    }
-
-    return data.session?.access_token ?? null
+async function getAccessToken(_supabase: SupabaseClient): Promise<string | null> {
+    return getBetterAuthToken()
 }
 
 function normalizeText(value: unknown): string | null {

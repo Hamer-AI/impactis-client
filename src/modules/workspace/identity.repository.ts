@@ -1,5 +1,11 @@
-import type { SupabaseClient, User } from '@supabase/supabase-js'
+type SupabaseClient = unknown
+type User = {
+    id: string
+    email?: string | null
+    last_sign_in_at?: string | null
+}
 import { apiRequest } from '@/lib/api/rest-client'
+import { getBetterAuthToken } from '@/lib/better-auth-token'
 import type {
     OrganizationMembership,
     OrganizationMemberDirectoryEntry,
@@ -494,12 +500,8 @@ function mapArray<T>(value: unknown, mapItem: (item: unknown) => T | null): T[] 
         .filter((item): item is T => !!item)
 }
 
-async function getAccessToken(supabase: SupabaseClient): Promise<string | null> {
-    const {
-        data: { session },
-    } = await supabase.auth.getSession()
-
-    return session?.access_token ?? null
+async function getAccessToken(_supabase: SupabaseClient): Promise<string | null> {
+    return getBetterAuthToken()
 }
 
 export async function getWorkspaceIdentityForUser(

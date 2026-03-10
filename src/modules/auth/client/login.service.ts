@@ -1,11 +1,10 @@
-import type { AuthApiError, SupabaseClient } from '@supabase/supabase-js'
-import { hasOrganizationMembershipForUser } from '@/modules/organizations'
-import { getPostAuthRedirectPath } from '../routing'
-
-type LoginErrorInput = Pick<AuthApiError, 'message' | 'code'>
+type LoginErrorInput = {
+    message?: string
+    code?: string | null
+}
 
 export function mapLoginErrorMessage(error: LoginErrorInput): string {
-    const normalizedMessage = error.message.toLowerCase()
+    const normalizedMessage = (error.message ?? '').toLowerCase()
     const normalizedCode = error.code?.toLowerCase()
 
     if (
@@ -30,20 +29,6 @@ export function mapLoginErrorMessage(error: LoginErrorInput): string {
         return 'Incorrect email or password.'
     }
 
-    return error.message
+    return error.message ?? 'Unable to sign in.'
 }
 
-export async function resolvePostLoginRedirect(supabase: SupabaseClient): Promise<string> {
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-        return '/'
-    }
-
-    const hasOrganizationMembership = await hasOrganizationMembershipForUser(supabase, user, {
-        failOpenOnRequestError: true,
-    })
-    return getPostAuthRedirectPath(hasOrganizationMembership)
-}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
@@ -24,8 +24,8 @@ import {
     Smartphone,
     X,
 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 import { apiRequest } from '@/lib/api/rest-client'
+import { authClient } from '@/lib/auth-client'
 
 type ActiveSessionItem = {
     id: string
@@ -34,6 +34,7 @@ type ActiveSessionItem = {
     user_agent: string | null
     created_at: string
     updated_at: string
+    token?: string | null
 }
 
 type SecuritySectionProps = {
@@ -220,6 +221,28 @@ function getDeviceIcon(os: string) {
     return Monitor
 }
 
+function getDeviceType(os: string): 'Desktop' | 'Mobile' {
+    if (os === 'Android' || os === 'iOS') return 'Mobile'
+    if (os === 'Windows' || os === 'macOS' || os === 'Linux') return 'Desktop'
+    return 'Desktop'
+}
+
+function formatIp(ip: string | null): string | null {
+    if (!ip) return null
+
+    const normalized = ip.trim().toLowerCase()
+    if (
+        normalized === '::1' ||
+        normalized === '127.0.0.1' ||
+        normalized === '0:0:0:0:0:0:0:1' ||
+        normalized === '0000:0000:0000:0000:0000:0000:0000:0000'
+    ) {
+        return 'Localhost'
+    }
+
+    return ip
+}
+
 export default function SecuritySection({
     userEmail,
     lastSignIn,
@@ -235,8 +258,60 @@ export default function SecuritySection({
     const [revokingId, setRevokingId] = useState<string | null>(null)
     const [isRevokingAll, setIsRevokingAll] = useState(false)
 
-    const supabase = createClient()
     const strength = getPasswordStrength(newPassword)
+
+    useEffect(() => {
+        let cancelled = false
+
+        async function loadSessionsFromBetterAuth() {
+            try {
+                const { data, error } = await authClient.listSessions()
+                if (cancelled || error || !data) {
+                    return
+                }
+
+                const mapped: ActiveSessionItem[] = data
+                    .map((session: any) => {
+                        const createdAt =
+                            typeof session.createdAt === 'string'
+                                ? session.createdAt
+                                : session.createdAt instanceof Date
+                                    ? session.createdAt.toISOString()
+                                    : new Date().toISOString()
+
+                        const updatedAt =
+                            typeof session.updatedAt === 'string'
+                                ? session.updatedAt
+                                : session.updatedAt instanceof Date
+                                    ? session.updatedAt.toISOString()
+                                    : createdAt
+
+                        return {
+                            id: String(session.id),
+                            user_id: String(session.userId),
+                            ip: session.ipAddress ?? null,
+                            user_agent: session.userAgent ?? null,
+                            created_at: createdAt,
+                            updated_at: updatedAt,
+                            token: session.token ?? null,
+                        }
+                    })
+                    // Newest first
+                    .sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1))
+
+                setLiveSessions(mapped)
+            } catch {
+                // best-effort; keep existing sessions state
+                return
+            }
+        }
+
+        void loadSessionsFromBetterAuth()
+
+        return () => {
+            cancelled = true
+        }
+    }, [])
 
     async function handleChangePassword(e: React.FormEvent) {
         e.preventDefault()
@@ -258,9 +333,12 @@ export default function SecuritySection({
 
         setIsUpdating(true)
         try {
-            const { error } = await supabase.auth.updateUser({ password: newPassword })
+            const { error } = await authClient.changePassword({
+                currentPassword,
+                newPassword,
+            })
             if (error) {
-                toast.error(error.message)
+                toast.error(error.message || 'Unable to update password.')
                 return
             }
 
@@ -278,20 +356,21 @@ export default function SecuritySection({
     async function handleRevokeSession(sessionId: string) {
         setRevokingId(sessionId)
         try {
-            const { data: { session } } = await supabase.auth.getSession()
-            const token = session?.access_token ?? null
-            const result = await apiRequest<{ success: boolean; message: string }>({
-                path: `/sessions/${sessionId}`,
-                method: 'DELETE',
-                accessToken: token,
-            })
-
-            if (result?.success) {
-                setLiveSessions((prev) => prev.filter((s) => s.id !== sessionId))
-                toast.success('Session revoked.')
-            } else {
-                toast.error(result?.message ?? 'Failed to revoke session.')
+            const target = liveSessions.find((s) => s.id === sessionId)
+            const token = target?.token ?? null
+            if (!token) {
+                toast.error('Unable to revoke this session.')
+                return
             }
+
+            const { error } = await authClient.revokeSession({ token })
+            if (error) {
+                toast.error(error.message ?? 'Failed to revoke session.')
+                return
+            }
+
+            setLiveSessions((prev) => prev.filter((s) => s.id !== sessionId))
+            toast.success('Session revoked.')
         } catch {
             toast.error('An unexpected error occurred.')
         } finally {
@@ -302,21 +381,15 @@ export default function SecuritySection({
     async function handleRevokeAllOtherSessions() {
         setIsRevokingAll(true)
         try {
-            const { data: { session } } = await supabase.auth.getSession()
-            const token = session?.access_token ?? null
-            const result = await apiRequest<{ success: boolean; message: string; count: number }>({
-                path: '/sessions',
-                method: 'DELETE',
-                accessToken: token,
-            })
-
-            if (result?.success) {
-                setLiveSessions((prev) => [prev[0]].filter(Boolean))
-                toast.success(result.message)
-                router.refresh()
-            } else {
-                toast.error(result?.message ?? 'Failed to revoke sessions.')
+            const { error } = await authClient.revokeOtherSessions()
+            if (error) {
+                toast.error(error.message ?? 'Failed to revoke sessions.')
+                return
             }
+
+            setLiveSessions((prev) => [prev[0]].filter(Boolean))
+            toast.success('Signed out of all other sessions.')
+            router.refresh()
         } catch {
             toast.error('An unexpected error occurred.')
         } finally {
@@ -335,7 +408,7 @@ export default function SecuritySection({
             dateStyle: 'medium',
             timeStyle: 'short',
         })
-        : 'Unknown'
+        : 'Currently active'
 
     const lastSignInRelative = lastSignIn
         ? getRelativeTime(new Date(lastSignIn))
@@ -509,6 +582,7 @@ export default function SecuritySection({
                         liveSessions.map((sess, index) => {
                             const parsed = parseUserAgent(sess.user_agent)
                             const DeviceIcon = getDeviceIcon(parsed.os)
+                            const deviceType = getDeviceType(parsed.os)
                             const isCurrentDevice = index === 0
                             const sessionTime = getRelativeTime(new Date(sess.updated_at))
                             const sessionCreated = new Date(sess.created_at).toLocaleString('en-US', {
@@ -537,6 +611,11 @@ export default function SecuritySection({
                                         <div className="flex items-center gap-2.5">
                                             <p className={`text-sm font-bold ${textMainClass}`}>
                                                 {parsed.label}
+                                                {deviceType && (
+                                                    <span className={`ml-2 text-[11px] font-medium ${textMutedClass}`}>
+                                                        · {deviceType}
+                                                    </span>
+                                                )}
                                             </p>
                                             {isCurrentDevice && (
                                                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-emerald-500">
@@ -546,10 +625,10 @@ export default function SecuritySection({
                                             )}
                                         </div>
                                         <div className={`mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] font-medium ${textMutedClass}`}>
-                                            {sess.ip && (
+                                            {formatIp(sess.ip) && (
                                                 <span className="flex items-center gap-1.5">
                                                     <Globe className="h-3 w-3" />
-                                                    {sess.ip}
+                                                    {formatIp(sess.ip)}
                                                 </span>
                                             )}
                                             <span className="flex items-center gap-1.5">

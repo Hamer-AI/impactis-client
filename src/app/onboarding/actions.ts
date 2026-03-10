@@ -1,7 +1,8 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { headers } from 'next/headers'
+import { auth } from '@/lib/auth'
 import { getPostAuthRedirectPath } from '@/modules/auth'
 import {
     createOrganizationWithOwner,
@@ -40,16 +41,16 @@ export async function completeOnboardingAction(
     _previousState: OnboardingActionState,
     formData: FormData
 ): Promise<OnboardingActionState> {
-    const supabase = await createClient()
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
+    const session = await auth.api.getSession({
+        headers: await headers(),
+    })
+    const user = session?.user as any
 
     if (!user) {
         return { error: 'Your session has expired. Please log in again.' }
     }
 
-    const existingMembership = await getPrimaryOrganizationMembershipByUserId(supabase, user.id)
+    const existingMembership = await getPrimaryOrganizationMembershipByUserId(null as any, user.id)
     if (existingMembership) {
         redirect(getPostAuthRedirectPath(true))
     }
@@ -68,7 +69,7 @@ export async function completeOnboardingAction(
     }
 
     try {
-        await createOrganizationWithOwner(supabase, {
+        await createOrganizationWithOwner(null as any, {
             type,
             name,
             location,

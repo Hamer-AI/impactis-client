@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { authClient } from '@/lib/auth-client'
 import TurnstileWidget from '@/components/auth/TurnstileWidget'
 import {
     buildSignupMetadata,
@@ -39,7 +39,6 @@ export default function SignupPage() {
     })
 
     const router = useRouter()
-    const supabase = createClient()
 
     useEffect(() => {
         const query = new URLSearchParams(window.location.search)
@@ -75,28 +74,29 @@ export default function SignupPage() {
                 role: formData.role,
             })
 
-            const { data, error: signupError } = await supabase.auth.signUp({
+            const { data: betterAuthData, error: betterAuthError } = await authClient.signUp.email({
                 email: formData.email,
                 password: formData.password,
-                options: {
-                    data: metadata,
-                    emailRedirectTo: resolvedNextPath
-                        ? getSignupEmailRedirectUrlWithNext(window.location.origin, resolvedNextPath)
-                        : getSignupEmailRedirectUrl(window.location.origin),
-                    captchaToken,
+                name: formData.fullName,
+                callbackURL: resolvedNextPath ?? getPostSignupRedirectPath(null),
+                // Better Auth's generated type doesn't expose metadata on this helper yet.
+                // We still send it through to the API.
+                metadata,
+                fetchOptions: {
+                    headers: {
+                        'x-captcha-response': captchaToken ?? '',
+                    },
                 },
-            })
+            } as any)
 
-            if (signupError) {
-                toast.error(signupError.message)
+            if (betterAuthError || !betterAuthData) {
+                toast.error(betterAuthError?.message ?? 'Unable to create account')
                 setCaptchaResetSignal((current) => current + 1)
                 return
             }
 
-            if (data.user) {
-                toast.success('Account created! Please check your email for confirmation.')
-                router.push(getPostSignupRedirectPath(resolvedNextPath))
-            }
+            toast.success('Account created! Please check your email for confirmation.')
+            router.push(getPostSignupRedirectPath(resolvedNextPath))
         } catch {
             toast.error('An unexpected error occurred')
         } finally {

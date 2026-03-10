@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import {
     Building2,
@@ -9,7 +9,7 @@ import {
     UserRound,
 } from 'lucide-react'
 import type { ComponentType } from 'react'
-import { createClient } from '@/lib/supabase/server'
+import { auth } from '@/lib/auth'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -126,16 +126,16 @@ function SidebarNavLink(input: {
 }
 
 export default async function WorkspaceProfilePage() {
-    const supabase = await createClient()
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
+    const session = await auth.api.getSession({
+        headers: await headers(),
+    })
 
-    if (!user) {
+    if (!session) {
         redirect('/auth/login')
     }
 
-    const { profile, membership } = await getWorkspaceIdentityForUser(supabase, user)
+    const user = session.user
+    const { profile, membership } = await getWorkspaceIdentityForUser(null as any, user as any)
 
     if (!membership) {
         redirect(getOnboardingPath())

@@ -1,8 +1,10 @@
 'use server'
 
 import { revalidatePath, revalidateTag } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
+import { headers } from 'next/headers'
+import { auth } from '@/lib/auth'
 import { logServerTelemetry } from '@/lib/telemetry/server'
+import { deleteLocalFile } from '@/lib/storage/local-storage'
 import { getPrimaryOrganizationMembershipForUser } from '@/modules/organizations'
 import { WORKSPACE_IDENTITY_CACHE_TAG } from '@/modules/workspace'
 import { apiRequest } from '@/lib/api/rest-client'
@@ -140,23 +142,8 @@ function buildProfileAvatarObjectPath(userId: string, file: File): string {
     return `${userId}/avatar-${crypto.randomUUID()}.${extension}`
 }
 
-function extractProfileAvatarObjectPath(publicUrl: string): string | null {
-    try {
-        const url = new URL(publicUrl)
-        const prefix = `/storage/v1/object/public/${PROFILE_AVATAR_BUCKET}/`
-        if (!url.pathname.startsWith(prefix)) {
-            return null
-        }
-
-        const path = decodeURIComponent(url.pathname.slice(prefix.length)).trim()
-        return path.length > 0 ? path : null
-    } catch {
-        return null
-    }
-}
-
 async function removeProfileAvatarObjectIfManaged(
-    supabase: Awaited<ReturnType<typeof createClient>>,
+    _supabase: unknown,
     publicUrl: string | null
 ): Promise<void> {
     const normalizedUrl = normalizeText(publicUrl)
@@ -164,28 +151,36 @@ async function removeProfileAvatarObjectIfManaged(
         return
     }
 
-    const objectPath = extractProfileAvatarObjectPath(normalizedUrl)
-    if (!objectPath) {
+    try {
+        const url = new URL(normalizedUrl)
+        const prefix = '/api/uploads/'
+        if (!url.pathname.startsWith(prefix)) {
+            return
+        }
+        const objectPath = decodeURIComponent(url.pathname.slice(prefix.length)).trim()
+        if (!objectPath) {
+            return
+        }
+        await deleteLocalFile(objectPath)
+    } catch {
         return
     }
-
-    await supabase.storage.from(PROFILE_AVATAR_BUCKET).remove([objectPath])
 }
 
 export async function updateProfileAction(
     _previousState: UpdateProfileActionState,
     formData: FormData
 ): Promise<UpdateProfileActionState> {
-    const supabase = await createClient()
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
+    const session = await auth.api.getSession({
+        headers: await headers(),
+    })
+    const user = session?.user as any
 
     if (!user) {
         return { error: 'Your session has expired. Please log in again.', success: null }
     }
 
-    const membership = await getPrimaryOrganizationMembershipForUser(supabase, user)
+    const membership = await getPrimaryOrganizationMembershipForUser(null as any, user)
     if (!membership) {
         return { error: 'Complete onboarding before editing your profile.', success: null }
     }
@@ -273,39 +268,57 @@ export async function updateProfileAction(
             avatarUrl = null
         }
 
-        if (avatarFile) {
-            const objectPath = buildProfileAvatarObjectPath(user.id, avatarFile)
-            const { error: uploadError } = await supabase.storage
-                .from(PROFILE_AVATAR_BUCKET)
-                .upload(objectPath, avatarFile, {
-                    cacheControl: '3600',
-                    contentType: avatarFile.type,
-                    upsert: false,
-                })
+        let avatarChanged = false
 
-            if (uploadError) {
-                return { error: `Avatar upload failed: ${uploadError.message}`, success: null }
+        if (avatarFile) {
+            const accessToken = await (await import('@/lib/better-auth-token')).getBetterAuthToken()
+            if (!accessToken) {
+                return { error: 'Your session has expired. Please log in again.', success: null }
             }
 
-            const { data: publicUrlData } = supabase.storage
-                .from(PROFILE_AVATAR_BUCKET)
-                .getPublicUrl(objectPath)
+            const uploadPayload = await apiRequest<{
+                success: boolean
+                message: string | null
+                uploadUrl: string | null
+                publicUrl: string | null
+                objectKey: string | null
+            }>({
+                path: '/files/profile/avatar/upload-url',
+                method: 'POST',
+                accessToken,
+                body: {
+                    fileName: avatarFile.name,
+                    contentType: avatarFile.type,
+                    contentLength: avatarFile.size,
+                },
+                throwOnError: true,
+            })
 
-            avatarUrl = normalizeText(publicUrlData.publicUrl)
-        }
+            if (!uploadPayload?.success || !uploadPayload.uploadUrl) {
+                const message = uploadPayload?.message ?? 'Unable to create profile avatar upload URL.'
+                return { error: message, success: null }
+            }
 
-        const {
-            data: { session },
-        } = await supabase.auth.getSession()
-        const accessToken = session?.access_token ?? null
-        if (!accessToken) {
-            return { error: 'Your session has expired. Please log in again.', success: null }
+            const putResponse = await fetch(uploadPayload.uploadUrl, {
+                method: 'PUT',
+                headers: {
+                    'content-type': avatarFile.type,
+                },
+                body: avatarFile,
+            })
+
+            if (!putResponse.ok) {
+                return { error: 'Unable to upload profile avatar right now.', success: null }
+            }
+
+            avatarUrl = uploadPayload.publicUrl ?? null
+            avatarChanged = true
         }
 
         const result = await apiRequest<{ success: boolean; message: string | null }>({
             path: '/profiles/me',
             method: 'PATCH',
-            accessToken,
+            accessToken: await (await import('@/lib/better-auth-token')).getBetterAuthToken(),
             body: {
                 fullName,
                 location,
@@ -326,8 +339,21 @@ export async function updateProfileAction(
         }
 
         if (avatarCurrentUrl && (avatarRemove || avatarFile)) {
-            await removeProfileAvatarObjectIfManaged(supabase, avatarCurrentUrl)
+            await removeProfileAvatarObjectIfManaged(null as any, avatarCurrentUrl)
+            avatarChanged = true
         }
+
+        const successMessage = avatarChanged
+            ? avatarRemove && !avatarFile
+                ? 'Profile photo removed.'
+                : 'Profile updated and photo saved.'
+            : 'Profile details saved.'
+
+        revalidatePath('/workspace')
+        revalidatePath('/workspace/profile')
+        revalidateTag(WORKSPACE_IDENTITY_CACHE_TAG, 'max')
+
+        return { error: null, success: successMessage }
     } catch (error) {
         const message = error instanceof Error ? error.message : 'Unable to update profile right now.'
         logServerTelemetry({
@@ -342,10 +368,4 @@ export async function updateProfileAction(
         })
         return { error: message, success: null }
     }
-
-    revalidatePath('/workspace')
-    revalidatePath('/workspace/profile')
-    revalidateTag(WORKSPACE_IDENTITY_CACHE_TAG, 'max')
-
-    return { error: null, success: 'Profile updated successfully.' }
 }

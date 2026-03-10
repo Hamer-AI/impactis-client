@@ -1,5 +1,11 @@
-import type { SupabaseClient, User } from '@supabase/supabase-js'
+type SupabaseClient = unknown
+type User = {
+    id: string
+    email?: string | null
+    last_sign_in_at?: string | null
+}
 import { apiRequest } from '@/lib/api/rest-client'
+import { getBetterAuthToken } from '@/lib/better-auth-token'
 import type { UserProfile } from './types'
 
 type PreferredContactMethod = NonNullable<UserProfile['preferred_contact_method']>
@@ -76,11 +82,8 @@ type WorkspaceIdentityApiResponse = {
     profile: unknown
 }
 
-async function getAccessToken(supabase: SupabaseClient): Promise<string | null> {
-    const {
-        data: { session },
-    } = await supabase.auth.getSession()
-    return session?.access_token ?? null
+async function getAccessToken(_supabase: SupabaseClient): Promise<string | null> {
+    return getBetterAuthToken()
 }
 
 export async function getProfileByUserId(

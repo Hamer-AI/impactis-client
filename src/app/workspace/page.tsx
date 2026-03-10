@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import {
     Activity,
     ArrowRight,
@@ -24,7 +24,7 @@ import {
     Crown,
 } from 'lucide-react'
 import type { ComponentType } from 'react'
-import { createClient } from '@/lib/supabase/server'
+import { auth } from '@/lib/auth'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge, type BadgeProps } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -597,16 +597,16 @@ function CoreTeamPanel(input: {
 // dashboard components here.
 
 export default async function WorkspacePage() {
-    const supabase = await createClient()
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
+    const session = await auth.api.getSession({
+        headers: await headers(),
+    })
 
-    if (!user) {
+    if (!session) {
         redirect('/auth/login')
     }
 
-    const bootstrapSnapshot = await getWorkspaceBootstrapForCurrentUser(supabase, user)
+    const user = session.user
+    const bootstrapSnapshot = await getWorkspaceBootstrapForCurrentUser(null as any, user as any)
     const { profile, membership } = bootstrapSnapshot
 
     if (!membership) {
@@ -634,8 +634,8 @@ export default async function WorkspacePage() {
             : null
     const organizationReadiness = bootstrapSnapshot.organization_readiness ?? null
     const [billingSnapshot, billingPlansSnapshot] = await Promise.all([
-        getBillingMeForCurrentUser(supabase),
-        getBillingPlansForCurrentUser(supabase, { segment: membership.organization.type }),
+        getBillingMeForCurrentUser(null as any),
+        getBillingPlansForCurrentUser(null as any, { segment: membership.organization.type }),
     ])
     const consultantRequestFeatureGate = membership.organization.type === 'startup'
         ? resolveConsultantRequestFeatureGate({

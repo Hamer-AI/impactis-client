@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { ActionFeedback } from '@/components/ui/action-feedback'
 import { toTitleCase } from '@/lib/utils'
@@ -51,6 +52,21 @@ export function ReadinessSection({
     textMainClass,
     textMutedClass,
 }: ReadinessSectionProps) {
+    const [startupWebsiteUrl, setStartupWebsiteUrl] = useState(defaultStartupWebsiteUrl)
+    const [startupTeamOverview, setStartupTeamOverview] = useState(defaultStartupTeamOverview)
+    const [startupCompanyStage, setStartupCompanyStage] = useState(defaultStartupCompanyStage)
+    const [startupFoundingYear, setStartupFoundingYear] = useState<string | number | ''>(
+        defaultStartupFoundingYear ?? '',
+    )
+    const [startupTeamSize, setStartupTeamSize] = useState<string | number | ''>(
+        defaultStartupTeamSize ?? '',
+    )
+    const [startupTargetMarket, setStartupTargetMarket] = useState(defaultStartupTargetMarket)
+    const [startupBusinessModel, setStartupBusinessModel] = useState(defaultStartupBusinessModel)
+    const [startupTractionSummary, setStartupTractionSummary] = useState(defaultStartupTractionSummary)
+    const [startupFinancialSummary, setStartupFinancialSummary] = useState(defaultStartupFinancialSummary)
+    const [startupLegalSummary, setStartupLegalSummary] = useState(defaultStartupLegalSummary)
+
     return (
         <div className={`rounded-3xl border p-6 ${mutedPanelClass} shadow-xl backdrop-blur-2xl`}>
             <form action={action} className="divide-y divide-slate-200/5">
@@ -69,14 +85,15 @@ export function ReadinessSection({
                             <input
                                 id="startupWebsiteUrl"
                                 name="startupWebsiteUrl"
-                                defaultValue={defaultStartupWebsiteUrl}
+                                value={startupWebsiteUrl}
+                                onChange={(event) => setStartupWebsiteUrl(event.target.value)}
                                 disabled={isPending}
                                 placeholder="https://startup.com"
                                 className={`w-full max-w-xl rounded-xl border px-4 py-3 text-sm outline-none transition-all disabled:cursor-not-allowed disabled:opacity-60 ${inputClass}`}
                             />
                         ) : (
                             <div className={`w-full max-w-xl rounded-xl border px-4 py-3 text-sm font-bold ${textMainClass} ${isLight ? 'bg-white/50 border-slate-100' : 'bg-slate-950/50 border-slate-800'}`}>
-                                {defaultStartupWebsiteUrl || 'Not set'}
+                                {startupWebsiteUrl || 'Not set'}
                             </div>
                         )}
                     </div>
@@ -97,7 +114,8 @@ export function ReadinessSection({
                             <textarea
                                 id="startupTeamOverview"
                                 name="startupTeamOverview"
-                                defaultValue={defaultStartupTeamOverview}
+                                value={startupTeamOverview}
+                                onChange={(event) => setStartupTeamOverview(event.target.value)}
                                 disabled={isPending}
                                 rows={4}
                                 placeholder="Describe relevant experience and expertise..."
@@ -105,7 +123,7 @@ export function ReadinessSection({
                             />
                         ) : (
                             <div className={`w-full max-w-xl rounded-xl border px-4 py-3 text-sm font-medium leading-relaxed ${textMainClass} ${isLight ? 'bg-white/50 border-slate-100' : 'bg-slate-950/50 border-slate-800'}`}>
-                                {defaultStartupTeamOverview || 'No team overview provided yet.'}
+                                {startupTeamOverview || 'No team overview provided yet.'}
                             </div>
                         )}
                     </div>
@@ -129,7 +147,8 @@ export function ReadinessSection({
                                     <select
                                         id="startupCompanyStage"
                                         name="startupCompanyStage"
-                                        defaultValue={defaultStartupCompanyStage}
+                                        value={startupCompanyStage}
+                                        onChange={(event) => setStartupCompanyStage(event.target.value)}
                                         disabled={isPending}
                                         className={`w-full rounded-xl border px-4 py-3 text-sm outline-none transition-all disabled:cursor-not-allowed disabled:opacity-60 ${inputClass}`}
                                     >
@@ -143,7 +162,7 @@ export function ReadinessSection({
                                     </select>
                                 ) : (
                                     <div className={`w-full rounded-xl border px-4 py-3 text-sm font-bold ${textMainClass} ${isLight ? 'bg-white/50 border-slate-100' : 'bg-slate-950/50 border-slate-800'}`}>
-                                        {toTitleCase(defaultStartupCompanyStage) || 'Not set'}
+                                        {toTitleCase(startupCompanyStage) || 'Not set'}
                                     </div>
                                 )}
                             </div>
@@ -156,14 +175,15 @@ export function ReadinessSection({
                                         type="number"
                                         min={1900}
                                         max={2100}
-                                        defaultValue={defaultStartupFoundingYear ?? ''}
+                                        value={startupFoundingYear}
+                                        onChange={(event) => setStartupFoundingYear(event.target.value)}
                                         disabled={isPending}
                                         placeholder="2024"
                                         className={`w-full rounded-xl border px-4 py-3 text-sm outline-none transition-all disabled:cursor-not-allowed disabled:opacity-60 ${inputClass}`}
                                     />
                                 ) : (
                                     <div className={`w-full rounded-xl border px-4 py-3 text-sm font-bold ${textMainClass} ${isLight ? 'bg-white/50 border-slate-100' : 'bg-slate-950/50 border-slate-800'}`}>
-                                        {defaultStartupFoundingYear || 'Not set'}
+                                        {startupFoundingYear || 'Not set'}
                                     </div>
                                 )}
                             </div>
@@ -175,14 +195,15 @@ export function ReadinessSection({
                                         name="startupTeamSize"
                                         type="number"
                                         min={1}
-                                        defaultValue={defaultStartupTeamSize ?? ''}
+                                        value={startupTeamSize}
+                                        onChange={(event) => setStartupTeamSize(event.target.value)}
                                         disabled={isPending}
                                         placeholder="8"
                                         className={`w-full rounded-xl border px-4 py-3 text-sm outline-none transition-all disabled:cursor-not-allowed disabled:opacity-60 ${inputClass}`}
                                     />
                                 ) : (
                                     <div className={`w-full rounded-xl border px-4 py-3 text-sm font-bold ${textMainClass} ${isLight ? 'bg-white/50 border-slate-100' : 'bg-slate-950/50 border-slate-800'}`}>
-                                        {defaultStartupTeamSize || 'Not set'}
+                                        {startupTeamSize || 'Not set'}
                                     </div>
                                 )}
                             </div>
@@ -208,7 +229,8 @@ export function ReadinessSection({
                                     <textarea
                                         id="startupTargetMarket"
                                         name="startupTargetMarket"
-                                        defaultValue={defaultStartupTargetMarket}
+                                        value={startupTargetMarket}
+                                        onChange={(event) => setStartupTargetMarket(event.target.value)}
                                         disabled={isPending}
                                         rows={4}
                                         placeholder="Primary customer segment, ICP, and geography."
@@ -216,7 +238,7 @@ export function ReadinessSection({
                                     />
                                 ) : (
                                     <div className={`w-full rounded-xl border px-4 py-3 text-sm font-medium leading-relaxed ${textMainClass} ${isLight ? 'bg-white/50 border-slate-100' : 'bg-slate-950/50 border-slate-800'}`}>
-                                        {defaultStartupTargetMarket || 'Not set'}
+                                        {startupTargetMarket || 'Not set'}
                                     </div>
                                 )}
                             </div>
@@ -226,7 +248,8 @@ export function ReadinessSection({
                                     <textarea
                                         id="startupBusinessModel"
                                         name="startupBusinessModel"
-                                        defaultValue={defaultStartupBusinessModel}
+                                        value={startupBusinessModel}
+                                        onChange={(event) => setStartupBusinessModel(event.target.value)}
                                         disabled={isPending}
                                         rows={4}
                                         placeholder="Revenue model, pricing structure, and distribution motion."
@@ -234,7 +257,7 @@ export function ReadinessSection({
                                     />
                                 ) : (
                                     <div className={`w-full rounded-xl border px-4 py-3 text-sm font-medium leading-relaxed ${textMainClass} ${isLight ? 'bg-white/50 border-slate-100' : 'bg-slate-950/50 border-slate-800'}`}>
-                                        {defaultStartupBusinessModel || 'Not set'}
+                                        {startupBusinessModel || 'Not set'}
                                     </div>
                                 )}
                             </div>
@@ -257,7 +280,8 @@ export function ReadinessSection({
                             <textarea
                                 id="startupTractionSummary"
                                 name="startupTractionSummary"
-                                defaultValue={defaultStartupTractionSummary}
+                                value={startupTractionSummary}
+                                onChange={(event) => setStartupTractionSummary(event.target.value)}
                                 disabled={isPending}
                                 rows={4}
                                 placeholder="Users, ARR, growth rate, or key enterprise milestones."
@@ -265,7 +289,7 @@ export function ReadinessSection({
                             />
                         ) : (
                             <div className={`w-full max-w-xl rounded-xl border px-4 py-3 text-sm font-medium leading-relaxed ${textMainClass} ${isLight ? 'bg-white/50 border-slate-100' : 'bg-slate-950/50 border-slate-800'}`}>
-                                {defaultStartupTractionSummary || 'No traction data provided yet.'}
+                                {startupTractionSummary || 'No traction data provided yet.'}
                             </div>
                         )}
                     </div>
@@ -289,7 +313,8 @@ export function ReadinessSection({
                                     <textarea
                                         id="startupFinancialSummary"
                                         name="startupFinancialSummary"
-                                        defaultValue={defaultStartupFinancialSummary}
+                                        value={startupFinancialSummary}
+                                        onChange={(event) => setStartupFinancialSummary(event.target.value)}
                                         disabled={isPending}
                                         rows={4}
                                         placeholder="Revenue, burn, runway, and key financial assumptions."
@@ -297,7 +322,7 @@ export function ReadinessSection({
                                     />
                                 ) : (
                                     <div className={`w-full rounded-xl border px-4 py-3 text-sm font-medium leading-relaxed ${textMainClass} ${isLight ? 'bg-white/50 border-slate-100' : 'bg-slate-950/50 border-slate-800'}`}>
-                                        {defaultStartupFinancialSummary || 'Not set'}
+                                        {startupFinancialSummary || 'Not set'}
                                     </div>
                                 )}
                             </div>
@@ -307,7 +332,8 @@ export function ReadinessSection({
                                     <textarea
                                         id="startupLegalSummary"
                                         name="startupLegalSummary"
-                                        defaultValue={defaultStartupLegalSummary}
+                                        value={startupLegalSummary}
+                                        onChange={(event) => setStartupLegalSummary(event.target.value)}
                                         disabled={isPending}
                                         rows={4}
                                         placeholder="Incorporation status, IP posture, and material legal notes."
@@ -315,7 +341,7 @@ export function ReadinessSection({
                                     />
                                 ) : (
                                     <div className={`w-full rounded-xl border px-4 py-3 text-sm font-medium leading-relaxed ${textMainClass} ${isLight ? 'bg-white/50 border-slate-100' : 'bg-slate-950/50 border-slate-800'}`}>
-                                        {defaultStartupLegalSummary || 'Not set'}
+                                        {startupLegalSummary || 'Not set'}
                                     </div>
                                 )}
                             </div>

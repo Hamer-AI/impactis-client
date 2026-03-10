@@ -1,7 +1,6 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
 import { logServerTelemetry } from '@/lib/telemetry/server'
 import {
     getOrganizationVerificationStatusByOrgId,

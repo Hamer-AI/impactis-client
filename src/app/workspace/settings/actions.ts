@@ -2,7 +2,9 @@
 
 import { revalidatePath, revalidateTag } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { headers } from 'next/headers'
+import { auth } from '@/lib/auth'
+import { getBetterAuthToken } from '@/lib/better-auth-token'
 import { logServerTelemetry } from '@/lib/telemetry/server'
 import {
     type BillingInterval,
@@ -337,38 +339,10 @@ function buildStartupDataRoomAssetObjectPath(
     return `${orgId}/data-room/${documentType}-${crypto.randomUUID()}.${extension}`
 }
 
-function extractOrganizationLogoObjectPath(publicUrl: string): string | null {
-    try {
-        const url = new URL(publicUrl)
-        const prefix = `/storage/v1/object/public/${ORGANIZATION_LOGO_BUCKET}/`
-        if (!url.pathname.startsWith(prefix)) {
-            return null
-        }
-
-        const path = decodeURIComponent(url.pathname.slice(prefix.length)).trim()
-        return path.length > 0 ? path : null
-    } catch {
-        return null
-    }
-}
-
-function extractStartupDataRoomAssetObjectPath(publicUrl: string): string | null {
-    try {
-        const url = new URL(publicUrl)
-        const prefix = `/storage/v1/object/public/${STARTUP_DATA_ROOM_ASSET_BUCKET}/`
-        if (!url.pathname.startsWith(prefix)) {
-            return null
-        }
-
-        const path = decodeURIComponent(url.pathname.slice(prefix.length)).trim()
-        return path.length > 0 ? path : null
-    } catch {
-        return null
-    }
-}
+import { saveLocalFile, deleteLocalFile, buildPublicUrlForObject } from '@/lib/storage/local-storage'
 
 async function removeOrganizationLogoObjectIfManaged(
-    supabase: Awaited<ReturnType<typeof createClient>>,
+    _supabase: unknown,
     publicUrl: string | null
 ): Promise<void> {
     const normalizedUrl = normalizeText(publicUrl)
@@ -376,45 +350,84 @@ async function removeOrganizationLogoObjectIfManaged(
         return
     }
 
-    const objectPath = extractOrganizationLogoObjectPath(normalizedUrl)
-    if (!objectPath) {
+    try {
+        const url = new URL(normalizedUrl)
+        const prefix = '/api/uploads/'
+        if (!url.pathname.startsWith(prefix)) {
+            return
+        }
+        const objectPath = decodeURIComponent(url.pathname.slice(prefix.length)).trim()
+        if (!objectPath) {
+            return
+        }
+        await deleteLocalFile(objectPath)
+    } catch {
         return
     }
-
-    await supabase.storage.from(ORGANIZATION_LOGO_BUCKET).remove([objectPath])
 }
 
 async function uploadStartupDataRoomAsset(input: {
-    supabase: Awaited<ReturnType<typeof createClient>>
     orgId: string
     documentType: StartupDataRoomDocumentType
     file: File
 }): Promise<{ publicUrl: string | null; storageBucket: string; storageObjectPath: string }> {
-    const objectPath = buildStartupDataRoomAssetObjectPath(input.orgId, input.file, input.documentType)
-    const { error: uploadError } = await input.supabase.storage
-        .from(STARTUP_DATA_ROOM_ASSET_BUCKET)
-        .upload(objectPath, input.file, {
-            cacheControl: '3600',
-            upsert: false,
-            contentType: input.file.type,
-        })
-    if (uploadError) {
-        throw new Error(`Data room upload failed: ${uploadError.message}`)
+    const accessToken = await getBetterAuthToken()
+    if (!accessToken) {
+        throw new Error('Your session has expired. Please log in again.')
     }
 
-    const {
-        data: { publicUrl },
-    } = input.supabase.storage.from(STARTUP_DATA_ROOM_ASSET_BUCKET).getPublicUrl(objectPath)
+    const uploadPayload = await apiRequest<{
+        success: boolean
+        message: string | null
+        uploadUrl: string | null
+        publicUrl: string | null
+        objectKey: string | null
+    }>({
+        path: '/files/startups/data-room/upload-url',
+        method: 'POST',
+        accessToken,
+        body: {
+            orgId: input.orgId,
+            documentType: input.documentType,
+            fileName: input.file.name,
+            contentType: input.file.type,
+            contentLength: input.file.size,
+        },
+        throwOnError: true,
+    })
+
+    if (!uploadPayload?.success || !uploadPayload.uploadUrl || !uploadPayload.objectKey) {
+        throw new Error(uploadPayload?.message || 'Unable to create upload URL for data room document.')
+    }
+
+    const putResponse = await fetch(uploadPayload.uploadUrl, {
+        method: 'PUT',
+        headers: {
+            'content-type': input.file.type,
+        },
+        body: input.file,
+    })
+
+    if (!putResponse.ok) {
+        throw new Error('Upload to storage failed.')
+    }
+
+    const publicUrl = normalizeText(uploadPayload.publicUrl ?? null)
+    const objectKey = uploadPayload.objectKey
+    const logicalBucket = STARTUP_DATA_ROOM_ASSET_BUCKET
+    const storageObjectPath = objectKey.startsWith(`${logicalBucket}/`)
+        ? objectKey.slice(logicalBucket.length + 1)
+        : objectKey
 
     return {
-        publicUrl: normalizeText(publicUrl),
-        storageBucket: STARTUP_DATA_ROOM_ASSET_BUCKET,
-        storageObjectPath: objectPath,
+        publicUrl,
+        storageBucket: logicalBucket,
+        storageObjectPath,
     }
 }
 
 async function removeStartupDataRoomAssetIfManaged(
-    supabase: Awaited<ReturnType<typeof createClient>>,
+    _supabase: unknown,
     input: {
         publicUrl: string | null
         storageBucket?: string | null
@@ -423,18 +436,31 @@ async function removeStartupDataRoomAssetIfManaged(
 ): Promise<void> {
     const storageBucket = typeof input.storageBucket === 'string' ? input.storageBucket.trim() : null
     const storageObjectPath = typeof input.storageObjectPath === 'string' ? input.storageObjectPath.trim() : null
-    if (storageBucket === STARTUP_DATA_ROOM_ASSET_BUCKET && storageObjectPath) {
-        await supabase.storage.from(STARTUP_DATA_ROOM_ASSET_BUCKET).remove([storageObjectPath])
+
+    if (storageBucket === 'local' && storageObjectPath) {
+        await deleteLocalFile(storageObjectPath)
         return
     }
 
     const normalizedUrl = normalizeText(input.publicUrl)
-    const objectPath = normalizedUrl ? extractStartupDataRoomAssetObjectPath(normalizedUrl) : null
-    if (!objectPath) {
+    if (!normalizedUrl) {
         return
     }
 
-    await supabase.storage.from(STARTUP_DATA_ROOM_ASSET_BUCKET).remove([objectPath])
+    try {
+        const url = new URL(normalizedUrl)
+        const prefix = '/api/uploads/'
+        if (!url.pathname.startsWith(prefix)) {
+            return
+        }
+        const objectPath = decodeURIComponent(url.pathname.slice(prefix.length)).trim()
+        if (!objectPath) {
+            return
+        }
+        await deleteLocalFile(objectPath)
+    } catch {
+        return
+    }
 }
 
 function resolveInviteBaseUrl(): string {
@@ -447,20 +473,19 @@ function resolveInviteBaseUrl(): string {
 }
 
 async function requireOwnerSettingsContext(): Promise<{
-    supabase: Awaited<ReturnType<typeof createClient>>
     membership: NonNullable<Awaited<ReturnType<typeof getPrimaryOrganizationMembershipForUser>>>
     userId: string
 }> {
-    const supabase = await createClient()
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
+    const session = await auth.api.getSession({
+        headers: await headers(),
+    })
+    const user = session?.user as any
 
     if (!user) {
         throw new Error('Your session has expired. Please log in again.')
     }
 
-    const membership = await getPrimaryOrganizationMembershipForUser(supabase, user)
+    const membership = await getPrimaryOrganizationMembershipForUser(null as any, user)
     if (!membership) {
         throw new Error('Complete onboarding before updating organization settings.')
     }
@@ -469,23 +494,22 @@ async function requireOwnerSettingsContext(): Promise<{
         throw new Error('Only organization owner can update settings.')
     }
 
-    return { supabase, membership, userId: user.id }
+    return { membership, userId: user.id }
 }
 
 async function requireBillingEditorSettingsContext(): Promise<{
-    supabase: Awaited<ReturnType<typeof createClient>>
     membership: NonNullable<Awaited<ReturnType<typeof getPrimaryOrganizationMembershipForUser>>>
 }> {
-    const supabase = await createClient()
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
+    const session = await auth.api.getSession({
+        headers: await headers(),
+    })
+    const user = session?.user as any
 
     if (!user) {
         throw new Error('Your session has expired. Please log in again.')
     }
 
-    const membership = await getPrimaryOrganizationMembershipForUser(supabase, user)
+    const membership = await getPrimaryOrganizationMembershipForUser(null as any, user)
     if (!membership) {
         throw new Error('Complete onboarding before updating billing settings.')
     }
@@ -494,7 +518,7 @@ async function requireBillingEditorSettingsContext(): Promise<{
         throw new Error('Only organization owner or admin can update billing settings.')
     }
 
-    return { supabase, membership }
+    return { membership }
 }
 
 export async function updateOrganizationIdentitySectionAction(
@@ -510,7 +534,7 @@ export async function updateOrganizationIdentitySectionAction(
     }
 
     try {
-        const { supabase, membership, userId } = await requireOwnerSettingsContext()
+        const { membership, userId } = await requireOwnerSettingsContext()
         telemetryContext.orgType = membership.organization.type
         telemetryContext.memberRole = membership.member_role
 
@@ -577,30 +601,51 @@ export async function updateOrganizationIdentitySectionAction(
         }
 
         if (organizationLogoFile) {
-            const objectPath = buildOrganizationLogoObjectPath(membership.org_id, organizationLogoFile)
-            const { error: uploadError } = await supabase.storage
-                .from(ORGANIZATION_LOGO_BUCKET)
-                .upload(objectPath, organizationLogoFile, {
-                    cacheControl: '3600',
-                    contentType: organizationLogoFile.type,
-                    upsert: false,
-                })
-
-            if (uploadError) {
-                return { error: `Logo upload failed: ${uploadError.message}`, success: null }
+            const accessToken = await getBetterAuthToken()
+            if (!accessToken) {
+                return { error: 'Your session has expired. Please log in again.', success: null }
             }
 
-            const { data: publicUrlData } = supabase.storage
-                .from(ORGANIZATION_LOGO_BUCKET)
-                .getPublicUrl(objectPath)
+            const uploadPayload = await apiRequest<{
+                success: boolean
+                message: string | null
+                uploadUrl: string | null
+                publicUrl: string | null
+                objectKey: string | null
+            }>({
+                path: '/files/organizations/logo/upload-url',
+                method: 'POST',
+                accessToken,
+                body: {
+                    orgId: membership.org_id,
+                    fileName: organizationLogoFile.name,
+                    contentType: organizationLogoFile.type,
+                    contentLength: organizationLogoFile.size,
+                },
+                throwOnError: true,
+            })
 
-            organizationLogoUrl = normalizeText(publicUrlData.publicUrl)
+            if (!uploadPayload?.success || !uploadPayload.uploadUrl) {
+                const message = uploadPayload?.message ?? 'Unable to create organization logo upload URL.'
+                return { error: message, success: null }
+            }
+
+            const putResponse = await fetch(uploadPayload.uploadUrl, {
+                method: 'PUT',
+                headers: {
+                    'content-type': organizationLogoFile.type,
+                },
+                body: organizationLogoFile,
+            })
+
+            if (!putResponse.ok) {
+                return { error: 'Unable to upload organization logo right now.', success: null }
+            }
+
+            organizationLogoUrl = uploadPayload.publicUrl ?? null
         }
 
-        const {
-            data: { session },
-        } = await supabase.auth.getSession()
-        const accessToken = session?.access_token ?? null
+        const accessToken = await getBetterAuthToken()
         if (!accessToken) {
             return { error: 'Your session has expired. Please log in again.', success: null }
         }
@@ -623,31 +668,29 @@ export async function updateOrganizationIdentitySectionAction(
         }
 
         if (membership.organization.type === 'investor') {
-            const { error: investorProfileError } = await supabase
-                .from('investor_profiles')
-                .upsert(
-                    {
-                        investor_org_id: membership.org_id,
-                        thesis: investorThesis,
-                        sector_tags: investorSectorTags,
-                        check_size_min_usd: investorCheckSizeMinUsd,
-                        check_size_max_usd: investorCheckSizeMaxUsd,
-                        updated_by: userId,
-                        updated_at: new Date().toISOString(),
-                    },
-                    { onConflict: 'investor_org_id' }
-                )
-
-            if (investorProfileError) {
-                return {
-                    error: `Investor readiness fields update failed: ${investorProfileError.message}`,
-                    success: null,
-                }
+            const profilePatch = await apiRequest<{
+                thesis: string | null
+                sector_tags: string[]
+                check_size_min_usd: number | null
+                check_size_max_usd: number | null
+            }>({
+                path: 'organizations/me/investor-profile',
+                method: 'PATCH',
+                accessToken,
+                body: {
+                    thesis: investorThesis,
+                    sectorTags: investorSectorTags,
+                    checkSizeMinUsd: investorCheckSizeMinUsd,
+                    checkSizeMaxUsd: investorCheckSizeMaxUsd,
+                },
+            })
+            if (!profilePatch) {
+                return { error: 'Organization identity updated but investor profile could not be saved.', success: null }
             }
         }
 
         if (organizationLogoCurrentUrl && (organizationLogoRemove || organizationLogoFile)) {
-            await removeOrganizationLogoObjectIfManaged(supabase, organizationLogoCurrentUrl)
+            await removeOrganizationLogoObjectIfManaged(null as any, organizationLogoCurrentUrl)
         }
 
         revalidatePath('/workspace')
@@ -683,7 +726,7 @@ export async function updateStartupReadinessSectionAction(
     }
 
     try {
-        const { supabase, membership } = await requireOwnerSettingsContext()
+        const { membership } = await requireOwnerSettingsContext()
         telemetryContext.orgType = membership.organization.type
         telemetryContext.memberRole = membership.member_role
 
@@ -714,10 +757,7 @@ export async function updateStartupReadinessSectionAction(
             return { error: 'Team size must be at least 1.', success: null }
         }
 
-        const {
-            data: { session },
-        } = await supabase.auth.getSession()
-        const accessToken = session?.access_token ?? null
+        const accessToken = await getBetterAuthToken()
         if (!accessToken) {
             return { error: 'Your session has expired. Please log in again.', success: null }
         }
@@ -778,7 +818,7 @@ export async function updateStartupDiscoverySectionAction(
     }
 
     try {
-        const { supabase, membership } = await requireOwnerSettingsContext()
+        const { membership } = await requireOwnerSettingsContext()
         telemetryContext.orgType = membership.organization.type
         telemetryContext.memberRole = membership.member_role
 
@@ -798,10 +838,7 @@ export async function updateStartupDiscoverySectionAction(
             return { error: 'Startup discovery post requires both title and summary.', success: null }
         }
 
-        const {
-            data: { session },
-        } = await supabase.auth.getSession()
-        const accessToken = session?.access_token ?? null
+        const accessToken = await getBetterAuthToken()
         if (!accessToken) {
             return { error: 'Your session has expired. Please log in again.', success: null }
         }
@@ -858,7 +895,7 @@ export async function upsertStartupDataRoomDocumentSectionAction(
     }
 
     try {
-        const { supabase, membership } = await requireOwnerSettingsContext()
+        const { membership } = await requireOwnerSettingsContext()
         telemetryContext.orgType = membership.organization.type
         telemetryContext.memberRole = membership.member_role
 
@@ -900,16 +937,12 @@ export async function upsertStartupDataRoomDocumentSectionAction(
             }
         }
 
-        const {
-            data: { session },
-        } = await supabase.auth.getSession()
-        const accessToken = session?.access_token ?? null
+        const accessToken = await getBetterAuthToken()
         if (!accessToken) {
             return { error: 'Your session has expired. Please log in again.', success: null }
         }
 
         const uploadPayload = await uploadStartupDataRoomAsset({
-            supabase,
             orgId: membership.org_id,
             documentType,
             file,
@@ -972,7 +1005,7 @@ export async function deleteStartupDataRoomDocumentSectionAction(
     }
 
     try {
-        const { supabase, membership } = await requireOwnerSettingsContext()
+        const { membership } = await requireOwnerSettingsContext()
         telemetryContext.orgType = membership.organization.type
         telemetryContext.memberRole = membership.member_role
 
@@ -988,10 +1021,7 @@ export async function deleteStartupDataRoomDocumentSectionAction(
             return { error: 'Data room document id is required.', success: null }
         }
 
-        const {
-            data: { session },
-        } = await supabase.auth.getSession()
-        const accessToken = session?.access_token ?? null
+        const accessToken = await getBetterAuthToken()
         if (!accessToken) {
             return { error: 'Your session has expired. Please log in again.', success: null }
         }
@@ -1005,7 +1035,7 @@ export async function deleteStartupDataRoomDocumentSectionAction(
             return { error: mutation?.message ?? 'Unable to remove data room document right now.', success: null }
         }
 
-        await removeStartupDataRoomAssetIfManaged(supabase, {
+        await removeStartupDataRoomAssetIfManaged(null as any, {
             publicUrl: documentUrl,
             storageBucket: documentStorageBucket,
             storageObjectPath: documentStorageObjectPath,
@@ -1044,7 +1074,7 @@ export async function updateBillingSubscriptionSectionAction(
     }
 
     try {
-        const { supabase, membership } = await requireBillingEditorSettingsContext()
+        const { membership } = await requireBillingEditorSettingsContext()
         telemetryContext.orgType = membership.organization.type
         telemetryContext.memberRole = membership.member_role
 
@@ -1056,7 +1086,7 @@ export async function updateBillingSubscriptionSectionAction(
 
         const stripeRedirectEnabled = isStripeBillingRedirectEnabled()
         if (!stripeRedirectEnabled) {
-            const mutation = await updateBillingSubscriptionForCurrentUser(supabase, {
+            const mutation = await updateBillingSubscriptionForCurrentUser(null as any, {
                 planCode,
                 billingInterval,
             })
@@ -1083,7 +1113,7 @@ export async function updateBillingSubscriptionSectionAction(
         }
 
         const baseUrl = resolveInviteBaseUrl()
-        const checkout = await createStripeCheckoutSessionForCurrentUser(supabase, {
+        const checkout = await createStripeCheckoutSessionForCurrentUser(null as any, {
             planCode,
             billingInterval,
             successUrl: baseUrl
@@ -1151,7 +1181,7 @@ export async function openBillingPortalSectionAction(
     }
 
     try {
-        const { supabase, membership } = await requireBillingEditorSettingsContext()
+        const { membership } = await requireBillingEditorSettingsContext()
         telemetryContext.orgType = membership.organization.type
         telemetryContext.memberRole = membership.member_role
 
@@ -1163,7 +1193,7 @@ export async function openBillingPortalSectionAction(
         }
 
         const baseUrl = resolveInviteBaseUrl()
-        const portal = await createStripePortalSessionForCurrentUser(supabase, {
+        const portal = await createStripePortalSessionForCurrentUser(null as any, {
             returnUrl: baseUrl
                 ? `${baseUrl}/workspace/settings?section=settings-billing`
                 : null,
@@ -1210,16 +1240,16 @@ export async function updateOrganizationSettingsAction(
     _previousState: UpdateOrganizationSettingsActionState,
     formData: FormData
 ): Promise<UpdateOrganizationSettingsActionState> {
-    const supabase = await createClient()
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
+    const session = await auth.api.getSession({
+        headers: await headers(),
+    })
+    const user = session?.user as any
 
     if (!user) {
         return { error: 'Your session has expired. Please log in again.', success: null }
     }
 
-    const membership = await getPrimaryOrganizationMembershipForUser(supabase, user)
+    const membership = await getPrimaryOrganizationMembershipForUser(null as any, user)
     if (!membership) {
         return { error: 'Complete onboarding before updating organization settings.', success: null }
     }
@@ -1289,29 +1319,12 @@ export async function updateOrganizationSettingsAction(
 
         if (organizationLogoFile) {
             const objectPath = buildOrganizationLogoObjectPath(membership.org_id, organizationLogoFile)
-            const { error: uploadError } = await supabase.storage
-                .from(ORGANIZATION_LOGO_BUCKET)
-                .upload(objectPath, organizationLogoFile, {
-                    cacheControl: '3600',
-                    contentType: organizationLogoFile.type,
-                    upsert: false,
-                })
-
-            if (uploadError) {
-                return { error: `Logo upload failed: ${uploadError.message}`, success: null }
-            }
-
-            const { data: publicUrlData } = supabase.storage
-                .from(ORGANIZATION_LOGO_BUCKET)
-                .getPublicUrl(objectPath)
-
-            organizationLogoUrl = normalizeText(publicUrlData.publicUrl)
+            const storagePath = `${ORGANIZATION_LOGO_BUCKET}/${objectPath}`
+            await saveLocalFile(storagePath, organizationLogoFile)
+            organizationLogoUrl = buildPublicUrlForObject(storagePath)
         }
 
-        const {
-            data: { session },
-        } = await supabase.auth.getSession()
-        const accessToken = session?.access_token ?? null
+        const accessToken = await getBetterAuthToken()
         if (!accessToken) {
             return { error: 'Your session has expired. Please log in again.', success: null }
         }
@@ -1334,14 +1347,11 @@ export async function updateOrganizationSettingsAction(
         }
 
         if (organizationLogoCurrentUrl && (organizationLogoRemove || organizationLogoFile)) {
-            await removeOrganizationLogoObjectIfManaged(supabase, organizationLogoCurrentUrl)
+            await removeOrganizationLogoObjectIfManaged(null as any, organizationLogoCurrentUrl)
         }
 
         if (membership.organization.type === 'startup') {
-            const {
-                data: { session },
-            } = await supabase.auth.getSession()
-            const accessToken = session?.access_token ?? null
+            const accessToken = await getBetterAuthToken()
             if (!accessToken) {
                 return { error: 'Your session has expired. Please log in again.', success: null }
             }
@@ -1411,10 +1421,10 @@ export async function createOrganizationInviteAction(
 ): Promise<CreateOrganizationInviteActionState> {
     void _previousState
 
-    const supabase = await createClient()
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
+    const session = await auth.api.getSession({
+        headers: await headers(),
+    })
+    const user = session?.user as any
 
     if (!user) {
         return {
@@ -1425,7 +1435,7 @@ export async function createOrganizationInviteAction(
         }
     }
 
-    const membership = await getPrimaryOrganizationMembershipForUser(supabase, user)
+    const membership = await getPrimaryOrganizationMembershipForUser(null as any, user)
     if (!membership) {
         return {
             error: 'Complete onboarding before inviting members.',
@@ -1459,10 +1469,7 @@ export async function createOrganizationInviteAction(
 
     const expiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString()
     try {
-        const {
-            data: { session },
-        } = await supabase.auth.getSession()
-        const accessToken = session?.access_token ?? null
+        const accessToken = await getBetterAuthToken()
         if (!accessToken) {
             return {
                 error: 'Your session has expired. Please log in again.',
@@ -1544,17 +1551,17 @@ export async function revokeOrganizationInviteAction(formData: FormData): Promis
     }
 
     try {
-        const supabase = await createClient()
-        const {
-            data: { user },
-        } = await supabase.auth.getUser()
+        const session = await auth.api.getSession({
+            headers: await headers(),
+        })
+        const user = session?.user as any
 
         if (!user) {
             throw new Error('Unauthorized')
         }
         telemetryContext.userId = user.id
 
-        const membership = await getPrimaryOrganizationMembershipForUser(supabase, user)
+        const membership = await getPrimaryOrganizationMembershipForUser(null as any, user)
         if (!membership) {
             throw new Error('Organization membership is required.')
         }
@@ -1570,10 +1577,7 @@ export async function revokeOrganizationInviteAction(formData: FormData): Promis
             throw new Error('Invite id is required.')
         }
 
-        const {
-            data: { session },
-        } = await supabase.auth.getSession()
-        const accessToken = session?.access_token ?? null
+        const accessToken = await getBetterAuthToken()
         if (!accessToken) {
             throw new Error('Your session has expired. Please log in again.')
         }

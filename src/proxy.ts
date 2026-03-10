@@ -1,8 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { updateSession } from '@/lib/supabase/middleware'
+import { auth } from '@/lib/auth'
 import {
     decideMiddlewareNavigation,
-    isAdminPath,
     isAuthEntryPath,
     isWorkspacePath,
 } from '@/modules/auth'
@@ -45,21 +44,15 @@ function writeMembershipCache(response: NextResponse, userId: string, hasMembers
     })
 }
 
-function copySupabaseCookies(target: NextResponse, source: NextResponse): NextResponse {
-    source.cookies.getAll().forEach((cookie) => {
-        target.cookies.set(cookie)
-    })
-
-    return target
-}
-
 export async function proxy(request: NextRequest) {
-    const { supabaseResponse, user, supabase } = await updateSession(request)
-
     const url = request.nextUrl.clone()
+    const session = await auth.api.getSession({
+        headers: request.headers,
+    })
+    const user = session?.user ?? null
     const onboardingPath = isOnboardingPath(url.pathname)
     const workspacePath = isWorkspacePath(url.pathname) || url.pathname.startsWith('/workspace/')
-    const isPlatformAdmin = user ? isPlatformAdminUser(user) : false
+    const isPlatformAdmin = user ? isPlatformAdminUser(user as any) : false
     const cachedMembership = user ? readMembershipCache(request, user.id) : null
     const shouldUseCachedMembership = cachedMembership !== null && !onboardingPath
     const shouldResolveMembership =
@@ -68,7 +61,6 @@ export async function proxy(request: NextRequest) {
         && !shouldUseCachedMembership
         && (
             onboardingPath
-            || isAdminPath(url.pathname)
             || isAuthEntryPath(url.pathname)
             || workspacePath
         )
@@ -76,7 +68,7 @@ export async function proxy(request: NextRequest) {
     let resolvedMembership = !!user
     if (shouldResolveMembership && user) {
         try {
-            resolvedMembership = await hasOrganizationMembershipForUser(supabase, user, {
+            resolvedMembership = await hasOrganizationMembershipForUser(null as any, user as any, {
                 throwOnRequestError: true,
             })
         } catch (error) {
@@ -104,19 +96,20 @@ export async function proxy(request: NextRequest) {
 
     if (decision.type === 'redirect') {
         url.pathname = decision.destination
-        const redirectResponse = copySupabaseCookies(NextResponse.redirect(url), supabaseResponse)
-        if (shouldWriteMembershipCache) {
+        const redirectResponse = NextResponse.redirect(url)
+        if (shouldWriteMembershipCache && user) {
             writeMembershipCache(redirectResponse, user.id, hasOrganizationMembership)
         }
 
         return redirectResponse
     }
 
-    if (shouldWriteMembershipCache) {
-        writeMembershipCache(supabaseResponse, user.id, hasOrganizationMembership)
+    const nextResponse = NextResponse.next()
+    if (shouldWriteMembershipCache && user) {
+        writeMembershipCache(nextResponse, user.id, hasOrganizationMembership)
     }
 
-    return supabaseResponse
+    return nextResponse
 }
 
 export const config = {
@@ -124,6 +117,5 @@ export const config = {
         '/auth/:path*',
         '/workspace/:path*',
         '/onboarding/:path*',
-        '/admin/:path*',
     ],
 }

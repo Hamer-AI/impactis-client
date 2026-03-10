@@ -4,8 +4,8 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { createClient } from '@/lib/supabase/client'
 import { Eye, EyeOff } from 'lucide-react'
+import { authClient } from '@/lib/auth-client'
 
 export default function UpdatePasswordPage() {
     const [password, setPassword] = useState('')
@@ -14,7 +14,6 @@ export default function UpdatePasswordPage() {
     const [showConfirmPassword, setShowConfirmPassword] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
     const router = useRouter()
-    const supabase = createClient()
 
     const handleUpdatePassword = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -29,11 +28,21 @@ export default function UpdatePasswordPage() {
             return
         }
 
+        const token = new URLSearchParams(window.location.search).get('token')
+        if (!token) {
+            toast.error('Reset token is missing or invalid.')
+            return
+        }
+
         setIsLoading(true)
         try {
-            const { error } = await supabase.auth.updateUser({ password })
+            const { error } = await authClient.resetPassword({
+                newPassword: password,
+                token,
+            })
+
             if (error) {
-                toast.error(error.message)
+                toast.error(error.message ?? 'Unable to reset password.')
                 return
             }
 

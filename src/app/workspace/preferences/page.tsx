@@ -1,4 +1,4 @@
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -12,8 +12,9 @@ import {
     Sparkles,
     LogOut,
 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/server'
 import { apiRequest } from '@/lib/api/rest-client'
+import { auth } from '@/lib/auth'
+import { getBetterAuthToken } from '@/lib/better-auth-token'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { getOnboardingPath } from '@/modules/onboarding'
@@ -105,22 +106,19 @@ export default async function PreferencesPage({
 }: {
     searchParams: Promise<{ section?: string | string[] }>
 }) {
-    const supabase = await createClient()
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
+    const session = await auth.api.getSession({
+        headers: await headers(),
+    })
 
-    if (!user) {
+    if (!session) {
         redirect('/auth/login')
     }
 
-    const {
-        data: { session },
-    } = await supabase.auth.getSession()
-    const accessToken = session?.access_token ?? null
+    const user = session.user
+    const accessToken = await getBetterAuthToken()
 
     const [identityResult, sessionsResult] = await Promise.all([
-        getWorkspaceIdentityForUser(supabase, user),
+        getWorkspaceIdentityForUser(null as any, user as any),
         accessToken
             ? apiRequest<SessionListResponse>({ path: '/sessions', accessToken })
             : Promise.resolve(null),
@@ -133,6 +131,7 @@ export default async function PreferencesPage({
     }
 
     const activeSessions = sessionsResult?.sessions ?? []
+    const lastSignIn = activeSessions.length > 0 ? activeSessions[0].updated_at : null
 
     const resolvedSearchParams = await searchParams
     const requestedSection = resolveSingleSearchParam(resolvedSearchParams.section)
@@ -364,7 +363,7 @@ export default async function PreferencesPage({
                         {activeSectionId === 'security' && (
                             <SecuritySection
                                 userEmail={user.email ?? 'Unknown'}
-                                lastSignIn={user.last_sign_in_at ?? null}
+                                lastSignIn={lastSignIn}
                                 sessions={activeSessions}
                                 isLight={isLight}
                             />

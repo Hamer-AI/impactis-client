@@ -1,1 +1,1 @@
-export { getAdminPath, isPlatformAdminEmail, isPlatformAdminUser } from './access'
+export { isPlatformAdminEmail, isPlatformAdminUser } from './access'

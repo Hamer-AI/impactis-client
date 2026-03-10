@@ -1,4 +1,4 @@
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -17,7 +17,7 @@ import {
     Users,
     LogOut,
 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/server'
+import { auth } from '@/lib/auth'
 import { Badge, type BadgeProps } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -38,6 +38,8 @@ import {
     getStartupDataRoomDocumentsForCurrentUser,
     type StartupDataRoomDocument,
 } from '@/modules/startups'
+import { getBetterAuthToken } from '@/lib/better-auth-token'
+import { apiRequest } from '@/lib/api/rest-client'
 import {
     getWorkspaceBootstrapForCurrentUser,
     getWorkspaceIdentityForUser,
@@ -351,33 +353,28 @@ export default async function WorkspaceSettingsPage({
 }: {
     searchParams: Promise<{ section?: string | string[]; stripe?: string | string[] }>
 }) {
-    const supabase = await createClient()
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
+    const session = await auth.api.getSession({
+        headers: await headers(),
+    })
 
-    if (!user) {
+    if (!session) {
         redirect('/auth/login')
     }
+
+    const user = session.user
 
     const resolvedSearchParams = await searchParams
     const requestedSection = resolveSingleSearchParam(resolvedSearchParams.section)
     const stripeCheckoutStatus = resolveStripeCheckoutStatus(resolvedSearchParams.stripe)
     const requestedSectionForSnapshot = requestedSection ?? 'settings-identity'
 
-    const {
-        data: { session },
-    } = await supabase.auth.getSession()
-    const sharedAccessToken = session?.access_token ?? null
-
     const [identitySnapshot, provisionalSettingsSnapshot, bootstrapSnapshot] = await Promise.all([
-        getWorkspaceIdentityForUser(supabase, user, { accessToken: sharedAccessToken }),
-        getWorkspaceSettingsSnapshotForCurrentUser(supabase, {
+        getWorkspaceIdentityForUser(null as any, user as any),
+        getWorkspaceSettingsSnapshotForCurrentUser(null as any, {
             section: requestedSectionForSnapshot,
-            accessToken: sharedAccessToken,
             userId: user.id,
         }),
-        getWorkspaceBootstrapForCurrentUser(supabase, user, { accessToken: sharedAccessToken }),
+        getWorkspaceBootstrapForCurrentUser(null as any, user as any),
     ])
 
     const { profile, membership } = identitySnapshot
@@ -435,13 +432,13 @@ export default async function WorkspaceSettingsPage({
     const shouldLoadStartupDataRoomDocuments = isStartupOrganization && activeSectionId === 'settings-data-room'
     const shouldLoadBillingPlans = activeSectionId === 'settings-billing' || shouldLoadDataRoomFeatureGate
 
-    const settingsSnapshot = activeSectionId === requestedSectionForSnapshot
-        ? provisionalSettingsSnapshot
-        : await getWorkspaceSettingsSnapshotForCurrentUser(supabase, {
-            section: activeSectionId,
-            accessToken: sharedAccessToken,
-            userId: user.id,
-        })
+    const settingsSnapshot =
+        activeSectionId === requestedSectionForSnapshot
+            ? provisionalSettingsSnapshot
+            : await getWorkspaceSettingsSnapshotForCurrentUser(null as any, {
+                section: activeSectionId,
+                userId: user.id,
+            })
 
     const verificationStatus: OrganizationVerificationStatus =
         settingsSnapshot?.verification_status ?? 'unverified'
@@ -462,14 +459,23 @@ export default async function WorkspaceSettingsPage({
         : null
     const currentPlan = settingsSnapshot?.current_plan ?? null
     const isInvestorOrganization = membership.organization.type === 'investor'
-    const investorProfileResult = isInvestorOrganization
-        ? await supabase
-            .from('investor_profiles')
-            .select('thesis, sector_tags, check_size_min_usd, check_size_max_usd')
-            .eq('investor_org_id', membership.org_id)
-            .maybeSingle()
-        : { data: null, error: null }
-    const investorProfile = investorProfileResult.data
+    const investorProfile = isInvestorOrganization
+        ? await (async () => {
+            const token = await getBetterAuthToken()
+            if (!token) return null
+            const data = await apiRequest<{
+                thesis: string | null
+                sector_tags: string[]
+                check_size_min_usd: number | null
+                check_size_max_usd: number | null
+            }>({
+                path: 'organizations/me/investor-profile',
+                method: 'GET',
+                accessToken: token,
+            })
+            return data
+        })()
+        : null
     const investorThesis = typeof investorProfile?.thesis === 'string'
         ? investorProfile.thesis
         : ''
@@ -483,10 +489,10 @@ export default async function WorkspaceSettingsPage({
     const investorCheckSizeMinUsd = normalizeNullableInteger(investorProfile?.check_size_min_usd)
     const investorCheckSizeMaxUsd = normalizeNullableInteger(investorProfile?.check_size_max_usd)
     const billingPlansSnapshot = shouldLoadBillingPlans
-        ? await getBillingPlansForCurrentUser(supabase, { segment: membership.organization.type })
+        ? await getBillingPlansForCurrentUser(null as any, { segment: membership.organization.type })
         : null
     const billingUsageSnapshot = shouldLoadDataRoomFeatureGate
-        ? await getBillingMeForCurrentUser(supabase)
+        ? await getBillingMeForCurrentUser(null as any)
         : null
     const billingPlans: BillingPlan[] = billingPlansSnapshot?.plans ?? []
     const dataRoomDocumentsFeatureGate = shouldLoadDataRoomFeatureGate
@@ -497,7 +503,7 @@ export default async function WorkspaceSettingsPage({
         })
         : null
     const startupDataRoomDocuments: StartupDataRoomDocument[] = shouldLoadStartupDataRoomDocuments
-        ? await getStartupDataRoomDocumentsForCurrentUser(supabase)
+        ? await getStartupDataRoomDocumentsForCurrentUser(null as any)
         : []
 
     const verificationMeta = getVerificationMeta(verificationStatus)

@@ -55,6 +55,16 @@ export default function ProfileForm({
     const [editingLocation, setEditingLocation] = useState(false)
     const [editingContacts, setEditingContacts] = useState(false)
     const [editingBio, setEditingBio] = useState(false)
+    const [fullName, setFullName] = useState(defaultFullName)
+    const [phone, setPhone] = useState(defaultPhone)
+    const [location, setLocation] = useState(defaultLocation)
+    const [websiteUrl, setWebsiteUrl] = useState(defaultWebsiteUrl)
+    const [linkedinUrl, setLinkedinUrl] = useState(defaultLinkedinUrl)
+    const [timezoneName, setTimezoneName] = useState(defaultTimezoneName || 'UTC')
+    const [preferredContactMethod, setPreferredContactMethod] = useState(defaultPreferredContactMethod)
+    const [bio, setBio] = useState(defaultBio)
+    const [headline, setHeadline] = useState(defaultHeadline)
+    const [currentAvatarUrl, setCurrentAvatarUrl] = useState(defaultAvatarUrl)
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const [hasNewAvatar, setHasNewAvatar] = useState(false)
 
@@ -94,14 +104,33 @@ export default function ProfileForm({
             return
         }
 
-        // Clear transient avatar state and show success toast.
+        const message = notice.success
+        const photoRemoved = /photo removed/i.test(message)
+        const photoSaved = /photo saved/i.test(message)
+        const photoChanged = photoRemoved || photoSaved
+
+        // Clear transient avatar state, close editors, and show success toast.
         setHasNewAvatar(false)
-        toast.success('Profile updated', {
-            description: 'Your profile details were saved successfully.',
+        setEditingPersonalInfo(false)
+        setEditingLocation(false)
+        setEditingContacts(false)
+        setEditingBio(false)
+
+        if (photoRemoved) {
+            setCurrentAvatarUrl('')
+            setPreviewUrl(null)
+        }
+
+        if (photoSaved && previewUrl) {
+            setCurrentAvatarUrl(previewUrl)
+        }
+
+        toast.success(photoChanged ? 'Profile photo updated' : 'Profile updated', {
+            description: message,
             duration: 3200,
             id: 'profile-update-success',
         })
-    }, [notice.success])
+    }, [notice.success, previewUrl])
 
     useEffect(() => {
         if (!notice.error) {
@@ -120,14 +149,14 @@ export default function ProfileForm({
             <h1 className={`text-2xl font-bold ${sectionTitleClass}`}>Edit Profile</h1>
 
             <form action={formAction} className="space-y-8">
-            <input type="hidden" name="avatarCurrentUrl" value={defaultAvatarUrl} />
+            <input type="hidden" name="avatarCurrentUrl" value={currentAvatarUrl} />
 
             {/* Profile photo */}
             <Card className={`${panelClass} overflow-hidden rounded-2xl`}>
                 <CardContent className="p-6">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
                         <Avatar className={`h-24 w-24 shrink-0 border-2 ${isLight ? 'border-slate-100' : 'border-slate-800'}`}>
-                            <AvatarImage src={previewUrl || defaultAvatarUrl} alt="Profile" />
+                            <AvatarImage src={previewUrl || currentAvatarUrl} alt="Profile" />
                             <AvatarFallback className={isLight ? 'bg-slate-100 text-slate-500' : 'bg-slate-800 text-slate-400'}>
                                 {defaultFullName?.trim() ? defaultFullName.trim().split(/\s+/).slice(0, 2).map((s) => s[0]).join('').toUpperCase() || 'U' : 'U'}
                             </AvatarFallback>
@@ -210,12 +239,33 @@ export default function ProfileForm({
                             <div className="grid gap-3 sm:grid-cols-2">
                                 <div>
                                     <label className={`block text-xs font-medium ${labelClass}`}>Full Name</label>
-                                    <input name="fullName" defaultValue={defaultFullName} className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm ${inputClass}`} />
+                                    <input
+                                        name="fullName"
+                                        value={fullName}
+                                        onChange={(event) => setFullName(event.target.value)}
+                                        className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm ${inputClass}`}
+                                    />
                                 </div>
                                 <div>
                                     <label className={`block text-xs font-medium ${labelClass}`}>Phone</label>
-                                    <input name="phone" defaultValue={defaultPhone} placeholder="(219) 555-0114" className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm ${inputClass}`} />
+                                    <input
+                                        name="phone"
+                                        value={phone}
+                                        onChange={(event) => setPhone(event.target.value)}
+                                        placeholder="(219) 555-0114"
+                                        className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm ${inputClass}`}
+                                    />
                                 </div>
+                            </div>
+                            <div className="mt-3">
+                                <label className={`block text-xs font-medium ${labelClass}`}>Headline / Profession</label>
+                                <input
+                                    name="headline"
+                                    value={headline}
+                                    onChange={(event) => setHeadline(event.target.value)}
+                                    placeholder="e.g. Product Manager at Impactis"
+                                    className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm ${inputClass}`}
+                                />
                             </div>
                             <p className={`text-xs ${textMutedClass}`}>Email is from your account.</p>
                             <div className="flex gap-2">
@@ -225,9 +275,10 @@ export default function ProfileForm({
                         </div>
                     ) : (
                         <dl className={`mt-4 space-y-2 text-sm ${textMainClass}`}>
-                            <div><span className={textMutedClass}>Full Name: </span>{defaultFullName || '—'}</div>
+                            <div><span className={textMutedClass}>Full Name: </span>{fullName || '—'}</div>
+                            <div><span className={textMutedClass}>Headline / Profession: </span>{headline || '—'}</div>
                             <div><span className={textMutedClass}>Email: </span>{defaultEmail || '—'}</div>
-                            <div><span className={textMutedClass}>Phone: </span>{defaultPhone || '—'}</div>
+                            <div><span className={textMutedClass}>Phone: </span>{phone || '—'}</div>
                         </dl>
                     )}
                 </CardContent>
@@ -266,7 +317,8 @@ export default function ProfileForm({
                                     <input
                                         id="location"
                                         name="location"
-                                        defaultValue={defaultLocation}
+                                        value={location}
+                                        onChange={(event) => setLocation(event.target.value)}
                                         placeholder="e.g. California"
                                         className={`flex-1 border-0 bg-transparent px-3 py-2.5 text-sm outline-none ${textMainClass}`}
                                     />
@@ -289,7 +341,7 @@ export default function ProfileForm({
                             <span className={textMutedClass}>
                                 <MapPin className="h-4 w-4" />
                             </span>
-                            <span className={textMainClass}>{defaultLocation || 'No location set yet.'}</span>
+                            <span className={textMainClass}>{location || 'No location set yet.'}</span>
                         </div>
                     )}
                 </CardContent>
@@ -318,7 +370,8 @@ export default function ProfileForm({
                                     <label className={`block text-xs font-medium ${labelClass}`}>Website URL</label>
                                     <input
                                         name="websiteUrl"
-                                        defaultValue={defaultWebsiteUrl}
+                                        value={websiteUrl}
+                                        onChange={(event) => setWebsiteUrl(event.target.value)}
                                         placeholder="https://example.com"
                                         className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm ${inputClass}`}
                                     />
@@ -327,7 +380,8 @@ export default function ProfileForm({
                                     <label className={`block text-xs font-medium ${labelClass}`}>LinkedIn URL</label>
                                     <input
                                         name="linkedinUrl"
-                                        defaultValue={defaultLinkedinUrl}
+                                        value={linkedinUrl}
+                                        onChange={(event) => setLinkedinUrl(event.target.value)}
                                         placeholder="https://www.linkedin.com/in/your-handle"
                                         className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm ${inputClass}`}
                                     />
@@ -339,7 +393,8 @@ export default function ProfileForm({
                                     <label className={`block text-xs font-medium ${labelClass}`}>Timezone</label>
                                     <input
                                         name="timezoneName"
-                                        defaultValue={defaultTimezoneName}
+                                        value={timezoneName}
+                                        onChange={(event) => setTimezoneName(event.target.value)}
                                         placeholder="e.g. Africa/Addis_Ababa"
                                         className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm ${inputClass}`}
                                     />
@@ -349,7 +404,8 @@ export default function ProfileForm({
                                     <label className={`block text-xs font-medium ${labelClass}`}>Preferred contact</label>
                                     <select
                                         name="preferredContactMethod"
-                                        defaultValue={defaultPreferredContactMethod}
+                                        value={preferredContactMethod}
+                                        onChange={(event) => setPreferredContactMethod(event.target.value)}
                                         className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm ${selectClass}`}
                                     >
                                         <option value="">No preference</option>
@@ -378,19 +434,19 @@ export default function ProfileForm({
                         <dl className={`mt-4 space-y-2 text-sm ${textMainClass}`}>
                             <div>
                                 <span className={textMutedClass}>Website: </span>
-                                <span>{defaultWebsiteUrl || '—'}</span>
+                                <span>{websiteUrl || '—'}</span>
                             </div>
                             <div>
                                 <span className={textMutedClass}>LinkedIn: </span>
-                                <span>{defaultLinkedinUrl || '—'}</span>
+                                <span>{linkedinUrl || '—'}</span>
                             </div>
                             <div>
                                 <span className={textMutedClass}>Timezone: </span>
-                                <span>{defaultTimezoneName || '—'}</span>
+                                <span>{timezoneName || '—'}</span>
                             </div>
                             <div>
                                 <span className={textMutedClass}>Preferred contact: </span>
-                                <span>{toTitleCase(defaultPreferredContactMethod) || 'No preference'}</span>
+                                <span>{toTitleCase(preferredContactMethod) || 'No preference'}</span>
                             </div>
                         </dl>
                     )}
@@ -398,15 +454,15 @@ export default function ProfileForm({
             </Card>
 
             {/* Hidden fields for submit from non-editing sections */}
-            {!editingPersonalInfo && <input type="hidden" name="fullName" value={defaultFullName} />}
-            {!editingPersonalInfo && <input type="hidden" name="phone" value={defaultPhone} />}
-            {!editingLocation && <input type="hidden" name="location" value={defaultLocation} />}
-            {!editingContacts && <input type="hidden" name="websiteUrl" value={defaultWebsiteUrl} />}
-            {!editingContacts && <input type="hidden" name="linkedinUrl" value={defaultLinkedinUrl} />}
-            {!editingContacts && <input type="hidden" name="timezoneName" value={defaultTimezoneName || 'UTC'} />}
-            {!editingContacts && <input type="hidden" name="preferredContactMethod" value={defaultPreferredContactMethod} />}
-            {!editingBio && <input type="hidden" name="bio" value={defaultBio} />}
-            <input type="hidden" name="headline" value={defaultHeadline} />
+            {!editingPersonalInfo && <input type="hidden" name="fullName" value={fullName} />}
+            {!editingPersonalInfo && <input type="hidden" name="phone" value={phone} />}
+            {!editingPersonalInfo && <input type="hidden" name="headline" value={headline} />}
+            {!editingLocation && <input type="hidden" name="location" value={location} />}
+            {!editingContacts && <input type="hidden" name="websiteUrl" value={websiteUrl} />}
+            {!editingContacts && <input type="hidden" name="linkedinUrl" value={linkedinUrl} />}
+            {!editingContacts && <input type="hidden" name="timezoneName" value={timezoneName || 'UTC'} />}
+            {!editingContacts && <input type="hidden" name="preferredContactMethod" value={preferredContactMethod} />}
+            {!editingBio && <input type="hidden" name="bio" value={bio} />}
 
             {/* Bio */}
             <Card className={`${panelClass} overflow-hidden rounded-2xl`}>
@@ -421,7 +477,14 @@ export default function ProfileForm({
                     </div>
                     {editingBio ? (
                         <div className="mt-4 space-y-4">
-                            <textarea name="bio" defaultValue={defaultBio} rows={4} placeholder="Write a short bio..." className={`w-full resize-none rounded-xl border px-3 py-2 text-sm ${inputClass}`} />
+                            <textarea
+                                name="bio"
+                                value={bio}
+                                onChange={(event) => setBio(event.target.value)}
+                                rows={4}
+                                placeholder="Write a short bio..."
+                                className={`w-full resize-none rounded-xl border px-3 py-2 text-sm ${inputClass}`}
+                            />
                             <div className="flex gap-2">
                                 <Button type="button" variant="outline" onClick={() => setEditingBio(false)} className="rounded-xl">Cancel</Button>
                                 <Button type="submit" disabled={isPending} className="rounded-xl bg-blue-600 hover:bg-blue-700">Save changes</Button>
@@ -429,7 +492,7 @@ export default function ProfileForm({
                         </div>
                     ) : (
                         <p className={`mt-4 text-sm leading-relaxed ${textMainClass}`}>
-                            {defaultBio && defaultBio.length > 180 ? `${defaultBio.slice(0, 180).trim()}…` : defaultBio || 'No biography provided yet.'}
+                            {bio && bio.length > 180 ? `${bio.slice(0, 180).trim()}…` : bio || 'No biography provided yet.'}
                         </p>
                     )}
                 </CardContent>

@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/server'
+import { headers } from 'next/headers'
+import { auth } from '@/lib/auth'
 import AcceptInviteForm from './AcceptInviteForm'
 
 function normalizeSearchParam(value: string | string[] | undefined): string | null {
@@ -55,10 +56,10 @@ export default async function InvitePage({
         )
     }
 
-    const supabase = await createClient()
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
+    const session = await auth.api.getSession({
+        headers: await headers(),
+    })
+    const user = session?.user ?? null
 
     const nextPath = `/invite?token=${encodeURIComponent(inviteToken)}`
 

@@ -1,5 +1,6 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
+type SupabaseClient = unknown
 import { apiRequest } from '@/lib/api/rest-client'
+import { getBetterAuthToken } from '@/lib/better-auth-token'
 import type {
     OrganizationMemberDirectoryEntry,
     OrganizationMemberRole,
@@ -165,11 +166,8 @@ function setCacheEntryValue<T>(
     })
 }
 
-async function getAccessToken(supabase: SupabaseClient): Promise<string | null> {
-    const {
-        data: { session },
-    } = await supabase.auth.getSession()
-    return session?.access_token ?? null
+async function getAccessToken(_supabase: SupabaseClient): Promise<string | null> {
+    return getBetterAuthToken()
 }
 
 function normalizeText(value: unknown): string | null {
