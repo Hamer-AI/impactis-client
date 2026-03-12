@@ -19,8 +19,6 @@ import {
     Zap,
     ShieldCheck,
     ChevronRight,
-    Bell,
-    Share2,
     Crown,
 } from 'lucide-react'
 import type { ComponentType } from 'react'
@@ -33,6 +31,8 @@ import { Separator } from '@/components/ui/separator'
 import { getOnboardingPath } from '@/modules/onboarding'
 import {
     evaluateOrganizationCapability,
+    getPrimaryOrganizationMembershipForUser,
+    hasOrganizationMembershipForUser,
     type OrganizationCapabilityGateResult,
     type OrganizationMemberDirectoryEntry,
     type OrganizationMemberRole,
@@ -54,9 +54,7 @@ import {
     resolveInvestorProfileViewFeatureGate,
 } from '@/modules/billing'
 import StartupDiscoveryFeedPanel from './StartupDiscoveryFeedPanel'
-import WorkspaceThemeToggle from './WorkspaceThemeToggle'
-import WorkspaceUserMenu from './WorkspaceUserMenu'
-import WorkspaceLayoutShell from './WorkspaceLayoutShell'
+import ConnectionRequestsWidget from './ConnectionRequestsWidget'
 
 type StatusMeta = {
     label: string
@@ -202,12 +200,14 @@ function CommandRibbon(input: {
 
 function ReadinessScoreV2(input: {
     completion: number,
+    onboardingScore: number,
     isLight: boolean,
     textMainClassName: string,
     textMutedClassName: string
 }) {
     const normalizedCompletion = Math.max(0, Math.min(100, input.completion))
     const remaining = Math.max(0, 100 - normalizedCompletion)
+    const normalizedOnboarding = Math.max(0, Math.min(100, input.onboardingScore))
     const radius = 45
     const circumference = 2 * Math.PI * radius
     const offset = circumference - (normalizedCompletion / 100) * circumference
@@ -254,6 +254,9 @@ function ReadinessScoreV2(input: {
                             You have filled <span className="text-emerald-500 font-bold">{normalizedCompletion}%</span> of required startup information.
                             Fill the remaining <span className="text-amber-500 font-bold">{remaining}%</span> to complete your profile.
                         </p>
+                        <p className={`mt-2 text-xs font-medium leading-relaxed ${input.textMutedClassName}`}>
+                            Onboarding score: <span className="text-emerald-500 font-bold">{normalizedOnboarding}/100</span>. You can finish onboarding anytime.
+                        </p>
                     </div>
 
                     <div className="space-y-2">
@@ -277,6 +280,15 @@ function ReadinessScoreV2(input: {
                             }`}
                     >
                         Complete profile <ArrowRight className="h-3.5 w-3.5" />
+                    </Link>
+                    <Link
+                        href="/onboarding/questions"
+                        className={`ml-3 inline-flex w-fit items-center gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-black uppercase tracking-widest transition-colors ${input.isLight
+                            ? 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                            : 'border-slate-700 bg-slate-900/40 text-slate-200 hover:bg-slate-900/70'
+                            }`}
+                    >
+                        Finish onboarding <ArrowRight className="h-3.5 w-3.5" />
                     </Link>
                 </div>
             </div>
@@ -596,7 +608,9 @@ function CoreTeamPanel(input: {
 // do not exist yet. When that API surface is implemented, add new
 // dashboard components here.
 
-export default async function WorkspacePage() {
+type WorkspacePageProps = { searchParams?: Promise<{ refresh?: string }> }
+
+export default async function WorkspacePage(props: WorkspacePageProps) {
     const session = await auth.api.getSession({
         headers: await headers(),
     })
@@ -606,11 +620,66 @@ export default async function WorkspacePage() {
     }
 
     const user = session.user
-    const bootstrapSnapshot = await getWorkspaceBootstrapForCurrentUser(null as any, user as any)
+    const metadata = (user as any)?.user_metadata as Record<string, unknown> | undefined
+    const role = (typeof metadata?.role === 'string' ? metadata.role : null) as string | null
+    const onboardingData =
+        metadata?.onboardingData && typeof metadata.onboardingData === 'object' && metadata.onboardingData !== null
+            ? (metadata.onboardingData as Record<string, any>)
+            : {}
+    const roleData = role ? onboardingData[role] : null
+    const onboardingScore =
+        typeof roleData?.score === 'number'
+            ? Math.max(0, Math.min(100, Math.round(roleData.score)))
+            : 0
+    const headersList = await headers()
+    const cookieHeader = headersList.get('cookie') ?? ''
+    const host = headersList.get('host') ?? headersList.get('x-forwarded-host')
+    let appOrigin = process.env.BETTER_AUTH_URL?.replace(/\/+$/, '') || 'http://127.0.0.1:3000'
+    if (host) {
+        const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http'
+        appOrigin = `${protocol}://${host}`.replace(/localhost/g, '127.0.0.1')
+    }
+    const searchParams = props.searchParams ? await props.searchParams : undefined
+    const skipCache = Boolean(searchParams?.refresh)
+    const bootstrapSnapshot = await getWorkspaceBootstrapForCurrentUser(null as any, user as any, {
+        skipCache,
+        proxyOptions: { cookieHeader, appOrigin },
+    })
     const { profile, membership } = bootstrapSnapshot
 
     if (!membership) {
-        redirect(getOnboardingPath())
+        // Use same membership check as onboarding to avoid redirect loop when bootstrap
+        // fails but /organizations/me/membership/exists returns true.
+        const hasMembership = await hasOrganizationMembershipForUser(null as any, user as any, {
+            failOpenOnRequestError: false,
+        })
+        if (!hasMembership) {
+            redirect(getOnboardingPath())
+        }
+        // Bootstrap failed but user has an org; fetch role so we can show role-specific dashboard message.
+        const primaryMembership = await getPrimaryOrganizationMembershipForUser(null as any, user as any)
+        const roleLabel = primaryMembership?.organization?.type
+            ? toTitleCase(primaryMembership.organization.type)
+            : 'workspace'
+        return (
+            <div className="flex min-h-[60vh] flex-col items-center justify-center gap-5 px-4 text-center">
+                <p className="text-muted-foreground max-w-md">
+                    Your <strong>{roleLabel}</strong> dashboard couldn’t be loaded. The app couldn’t reach the API server.
+                </p>
+                <p className="text-sm text-muted-foreground max-w-md">
+                    Make sure the Impactis API is running. In a separate terminal, from the project root run:{' '}
+                    <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">cd impactis-server && npm run dev</code>
+                </p>
+                <form action="/workspace?refresh=1" method="get">
+                    <button
+                        type="submit"
+                        className="rounded-lg bg-[#0B3D2E] px-4 py-2 text-sm font-medium text-white hover:bg-[#082a20]"
+                    >
+                        Try again
+                    </button>
+                </form>
+            </div>
+        )
     }
 
     // Read theme from cookies for consistent SSR
@@ -714,59 +783,7 @@ export default async function WorkspacePage() {
     const greeting = getGreetingForHour(currentHour)
 
     return (
-        <WorkspaceLayoutShell
-            isLight={isLight}
-            membership={membership}
-            profile={profile}
-            organizationCoreTeam={organizationCoreTeam}
-            verificationMeta={verificationMeta}
-            workspaceLabel={workspaceLabel}
-            navActiveClass={navActiveClass}
-            navIdleClass={navIdleClass}
-            textMainClass={textMainClass}
-            textMutedClass={textMutedClass}
-            mutedPanelClass={mutedPanelClass}
-            panelClass={panelClass}
-            pageShellClass={pageShellClass}
-            header={
-                <header className={`sticky top-0 z-30 flex h-20 shrink-0 items-center justify-between border-b px-10 backdrop-blur-3xl ${isLight ? 'border-slate-200 bg-white' : 'border-white/5 bg-[#070b14]/40'}`}>
-                    <div className="flex items-center gap-4">
-                        <nav className="flex items-center gap-3 text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">
-                            <span className="opacity-40">Workspace</span>
-                            <span className="opacity-20">/</span>
-                            <span className={textMainClass}>Operations</span>
-                        </nav>
-                    </div>
-
-                    <div className="flex items-center gap-6">
-                        <div className="flex items-center gap-3">
-                            <button className={`relative flex h-10 w-10 items-center justify-center rounded-full border transition-all hover:shadow-lg ${isLight ? 'border-slate-200 bg-white text-slate-400 hover:text-emerald-500' : 'border-white/5 bg-slate-900/40 text-slate-400 hover:text-emerald-500'}`}>
-                                <Bell className="h-5 w-5" />
-                                <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full border-2 border-white bg-emerald-500 dark:border-slate-900" />
-                            </button>
-                            <WorkspaceThemeToggle />
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                            {membership.organization.type === 'startup' ? (
-                                <Button className="h-9 gap-2 rounded-xl bg-emerald-500 px-4 text-[11px] font-black uppercase tracking-widest text-slate-950 hover:bg-emerald-400">
-                                    <Share2 className="h-3.5 w-3.5" />
-                                    Public Profile
-                                </Button>
-                            ) : null}
-                            <WorkspaceUserMenu
-                                displayName={profile.full_name?.trim() || membership.organization.name}
-                                email={user.email ?? null}
-                                avatarUrl={profile.avatar_url}
-                                isLight={isLight}
-                            />
-                        </div>
-                    </div>
-                </header>
-            }
-        >
-            {/* Dashboard Canvas */}
-            <div className="flex-1 overflow-y-auto p-10 ws-dashboard-canvas ws-fade-in-d1">
+        <div className="flex-1 overflow-y-auto p-10 ws-dashboard-canvas ws-fade-in-d1">
                 <div className="mx-auto max-w-[1440px] space-y-10">
                     {/* Integrated Command Ribbon */}
                     <CommandRibbon
@@ -847,14 +864,38 @@ export default async function WorkspacePage() {
                                     )}
                                 </div>
                             )}
+
+                            {membership.organization.type === 'advisor' && (
+                                <div className="relative">
+                                    <div className="mb-6 flex items-center justify-between">
+                                        <div>
+                                            <h2 className={`text-xl font-black tracking-tight ${textMainClass}`}>Discovery Pipeline</h2>
+                                            <p className={`text-[10px] font-bold uppercase tracking-widest mt-1 ${textMutedClass}`}>Startups seeking advisors &amp; opportunities</p>
+                                        </div>
+                                    </div>
+                                    <StartupDiscoveryFeedPanel
+                                        currentOrgId={membership.org_id}
+                                        feed={startupDiscoveryFeed}
+                                        isLight={isLight}
+                                        cardClassName={`${panelClass} border-none shadow-none rounded-[3rem]`}
+                                        mutedCardClassName={mutedPanelClass}
+                                        textMainClassName={textMainClass}
+                                        textMutedClassName={textMutedClass}
+                                    />
+                                </div>
+                            )}
                         </div>
 
                         {/* Intelligence Sidebar: Team & Activity Log */}
                         <div className="space-y-10">
-                            {membership.organization.type === 'startup' && startupReadiness && (
+                            {membership.organization.type === 'startup' && (
                                 <div className="space-y-8">
+                                    <ConnectionRequestsWidget isLight={isLight} />
+                                    {startupReadiness && (
+                                    <>
                                     <ReadinessScoreV2
                                         completion={startupReadiness.profile_completion_percent}
+                                        onboardingScore={onboardingScore}
                                         isLight={isLight}
                                         textMainClassName={textMainClass}
                                         textMutedClassName={textMutedClass}
@@ -871,6 +912,8 @@ export default async function WorkspacePage() {
                                         textMainClassName={textMainClass}
                                         textMutedClassName={textMutedClass}
                                     />
+                                    </>
+                                    )}
                                 </div>
                             )}
 
@@ -910,6 +953,5 @@ export default async function WorkspacePage() {
                 {/* Workspace Buffer */}
                 <div className="h-20" />
             </div>
-        </WorkspaceLayoutShell>
     )
 }

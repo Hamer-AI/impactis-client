@@ -1,13 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { authClient } from '@/lib/auth-client'
 import TurnstileWidget from '@/components/auth/TurnstileWidget'
 import {
     buildSignupMetadata,
     getPostSignupRedirectPath,
-    getSignupEmailRedirectUrl,
-    getSignupEmailRedirectUrlWithNext,
     getSignupRoleFromSearchParams,
     sanitizeNextPath,
 } from '@/modules/auth'
@@ -15,6 +15,10 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Rocket, TrendingUp, Briefcase, Check, Mail, Lock, User, Eye, EyeOff } from 'lucide-react'
+import { signupSchema, verifyEmailSchema, type SignupFormValues, type VerifyEmailFormValues } from '@/schemas/auth'
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp'
 
 const roles = [
     { id: 'founder', title: 'Founder', icon: Rocket, description: 'Raising capital or seeking strategic partners.' },
@@ -23,80 +27,87 @@ const roles = [
 ]
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? '0x4AAAAAACd7X251ebzrdbGy'
+// Always require the Cloudflare Turnstile security check (even in dev).
+const CAPTCHA_REQUIRED = true
 
 export default function SignupPage() {
-    const [step, setStep] = useState<1 | 2>(1)
+    const [step, setStep] = useState<1 | 2 | 3>(1)
     const [captchaToken, setCaptchaToken] = useState<string | null>(null)
     const [captchaResetSignal, setCaptchaResetSignal] = useState(0)
     const [isLoading, setIsLoading] = useState(false)
     const [showPassword, setShowPassword] = useState(false)
     const [nextPath, setNextPath] = useState<string | null>(null)
-    const [formData, setFormData] = useState({
-        email: '',
-        password: '',
-        fullName: '',
-        role: '',
+    const [emailForVerify, setEmailForVerify] = useState('')
+    const router = useRouter()
+
+    const signupForm = useForm<SignupFormValues>({
+        resolver: zodResolver(signupSchema),
+        defaultValues: { role: undefined, email: '', password: '', fullName: '' },
+    })
+    const verifyForm = useForm<VerifyEmailFormValues>({
+        resolver: zodResolver(verifyEmailSchema),
+        defaultValues: { otpCode: '' },
     })
 
-    const router = useRouter()
+    const roleValue = signupForm.watch('role')
 
     useEffect(() => {
         const query = new URLSearchParams(window.location.search)
         const roleFromSearch = getSignupRoleFromSearchParams(query)
         setNextPath(sanitizeNextPath(query.get('next')))
         if (roleFromSearch) {
-            setFormData((prev) => ({ ...prev, role: roleFromSearch }))
+            signupForm.setValue('role', roleFromSearch as SignupFormValues['role'])
             setStep(2)
         }
-    }, [])
+    }, [signupForm])
 
-    const handleSignup = async (e: React.FormEvent) => {
-        e.preventDefault()
-
-        if (!formData.role) {
+    const onSignupSubmit = async (values: SignupFormValues) => {
+        if (!values.role) {
             toast.error('Please select your role first.')
             setStep(1)
             return
         }
-
-        if (!captchaToken) {
+        if (CAPTCHA_REQUIRED && !captchaToken) {
             toast.error('Please complete the security check.')
             return
         }
-
         setIsLoading(true)
-
         try {
             const queryNextPath = sanitizeNextPath(new URLSearchParams(window.location.search).get('next'))
             const resolvedNextPath = nextPath ?? queryNextPath
+            const origin = typeof window !== 'undefined' ? window.location.origin : ''
+            const fallbackPath = getPostSignupRedirectPath(null)
+            const callbackPath = resolvedNextPath ?? fallbackPath
+            const callbackURL =
+                callbackPath.startsWith('http://') || callbackPath.startsWith('https://')
+                    ? callbackPath
+                    : origin
+                        ? `${origin}${callbackPath}`
+                        : callbackPath
             const metadata = buildSignupMetadata({
-                fullName: formData.fullName,
-                role: formData.role,
+                fullName: values.fullName,
+                role: values.role as string,
             })
-
             const { data: betterAuthData, error: betterAuthError } = await authClient.signUp.email({
-                email: formData.email,
-                password: formData.password,
-                name: formData.fullName,
-                callbackURL: resolvedNextPath ?? getPostSignupRedirectPath(null),
-                // Better Auth's generated type doesn't expose metadata on this helper yet.
-                // We still send it through to the API.
-                metadata,
+                email: values.email,
+                password: values.password,
+                name: values.fullName,
+                callbackURL,
+                raw_user_meta_data: JSON.stringify(metadata),
                 fetchOptions: {
                     headers: {
-                        'x-captcha-response': captchaToken ?? '',
+                        ...(captchaToken ? { 'x-captcha-response': captchaToken } : {}),
                     },
                 },
             } as any)
-
             if (betterAuthError || !betterAuthData) {
                 toast.error(betterAuthError?.message ?? 'Unable to create account')
-                setCaptchaResetSignal((current) => current + 1)
+                setCaptchaResetSignal((c) => c + 1)
                 return
             }
-
-            toast.success('Account created! Please check your email for confirmation.')
-            router.push(getPostSignupRedirectPath(resolvedNextPath))
+            setEmailForVerify(values.email)
+            toast.success('Account created! Please enter the 6-digit code sent to your email.')
+            setStep(3)
         } catch {
             toast.error('An unexpected error occurred')
         } finally {
@@ -104,12 +115,34 @@ export default function SignupPage() {
         }
     }
 
+    const onVerifySubmit = async (values: VerifyEmailFormValues) => {
+        setIsLoading(true)
+        try {
+            const { data, error } = await authClient.emailOtp.verifyEmail({
+                email: emailForVerify,
+                otp: values.otpCode,
+            } as any)
+            if (error || !data) {
+                toast.error(error?.message ?? 'Invalid or expired verification code')
+                return
+            }
+            toast.success('Successfully verified. Redirecting to login...')
+            const queryNextPath = sanitizeNextPath(new URLSearchParams(window.location.search).get('next'))
+            const loginPath = queryNextPath
+                ? `/auth/login?registered=true&next=${encodeURIComponent(queryNextPath)}`
+                : '/auth/login?registered=true'
+            router.push(loginPath)
+        } catch {
+            toast.error('An unexpected error occurred during verification')
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
     const isCreateDisabled =
-        isLoading
-        || !formData.fullName.trim()
-        || !formData.email.trim()
-        || formData.password.length < 6
-        || !captchaToken
+        isLoading ||
+        (CAPTCHA_REQUIRED && !captchaToken) ||
+        !signupForm.formState.isValid
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
@@ -138,7 +171,55 @@ export default function SignupPage() {
                 </div>
 
                 <div className="bg-white rounded-[2.5rem] shadow-2xl shadow-gray-200/50 p-8 md:p-12 border border-gray-100">
-                    {step === 1 ? (
+                    {step === 3 ? (
+                        <Form {...verifyForm}>
+                            <form onSubmit={verifyForm.handleSubmit(onVerifySubmit)} className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
+                                <div className="text-center">
+                                    <h2 className="text-3xl font-black text-gray-900 tracking-tight">Check your email</h2>
+                                    <p className="mt-2 text-gray-500 font-medium tracking-tight">
+                                        We sent a 6-digit code to <span className="text-[#0B3D2E] font-bold">{emailForVerify}</span>
+                                    </p>
+                                </div>
+                                <FormField
+                                    control={verifyForm.control}
+                                    name="otpCode"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel className="text-sm font-bold text-gray-400 uppercase tracking-widest block mb-2 px-1 text-center">Verification Code</FormLabel>
+                                            <FormControl>
+                                                <div className="flex justify-center">
+                                                    <InputOTP
+                                                        maxLength={6}
+                                                        value={field.value}
+                                                        onChange={(value) => field.onChange(value.replace(/[^0-9]/g, ''))}
+                                                        inputMode="numeric"
+                                                        autoFocus
+                                                    >
+                                                        <InputOTPGroup>
+                                                            {Array.from({ length: 6 }).map((_, idx) => (
+                                                                <InputOTPSlot key={idx} index={idx} />
+                                                            ))}
+                                                        </InputOTPGroup>
+                                                    </InputOTP>
+                                                </div>
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <p className="text-center text-sm text-gray-500">
+                                    Enter the 6-digit code from your email above, then click below.
+                                </p>
+                                <button
+                                    type="submit"
+                                    disabled={isLoading}
+                                    className="w-full py-4 rounded-2xl bg-[#0B3D2E] text-white font-black text-lg hover:shadow-xl hover:shadow-green-900/20 transition disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                                >
+                                    {isLoading ? 'Verifying...' : 'Verify Email'}
+                                </button>
+                            </form>
+                        </Form>
+                    ) : step === 1 ? (
                         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                             <div className="text-center">
                                 <h2 className="text-3xl font-black text-gray-900 tracking-tight">How will you participate?</h2>
@@ -150,17 +231,17 @@ export default function SignupPage() {
                                         key={role.id}
                                         type="button"
                                         onClick={() => {
-                                            setFormData((prev) => ({ ...prev, role: role.id }))
+                                            signupForm.setValue('role', role.id as SignupFormValues['role'])
                                             setStep(2)
                                         }}
                                         className={`p-6 rounded-3xl border-2 text-left transition-all group ${
-                                            formData.role === role.id ? 'border-[#0B3D2E] bg-green-50' : 'border-gray-100 hover:border-gray-200'
+                                            roleValue === role.id ? 'border-[#0B3D2E] bg-green-50' : 'border-gray-100 hover:border-gray-200'
                                         }`}
                                     >
                                         <div className="flex items-center space-x-6">
                                             <div
                                                 className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-colors ${
-                                                    formData.role === role.id
+                                                    roleValue === role.id
                                                         ? 'bg-[#0B3D2E] text-white'
                                                         : 'bg-gray-50 text-gray-400 group-hover:bg-gray-100'
                                                 }`}
@@ -177,91 +258,115 @@ export default function SignupPage() {
                             </div>
                         </div>
                     ) : (
-                        <form onSubmit={handleSignup} className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
-                            <div className="text-center">
-                                <h2 className="text-3xl font-black text-gray-900 tracking-tight">Create your account</h2>
-                                <p className="mt-2 text-gray-500 font-medium tracking-tight">
-                                    You selected{' '}
-                                    <span className="text-[#0B3D2E] font-bold capitalize">{formData.role}</span>
-                                </p>
-                            </div>
-
-                            <div className="space-y-6">
-                                <div>
-                                    <label className="text-sm font-bold text-gray-400 uppercase tracking-widest block mb-2 px-1">Full Name</label>
-                                    <div className="relative">
-                                        <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                                        <input
-                                            type="text"
-                                            className="w-full pl-12 pr-4 py-4 rounded-2xl border border-gray-100 bg-gray-50/50 focus:ring-4 focus:ring-green-500/10 focus:border-[#0B3D2E] outline-none transition-all font-medium"
-                                            placeholder="John Doe"
-                                            value={formData.fullName}
-                                            onChange={(e) => setFormData((prev) => ({ ...prev, fullName: e.target.value }))}
-                                        />
-                                    </div>
+                        <Form {...signupForm}>
+                            <form onSubmit={signupForm.handleSubmit(onSignupSubmit)} className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
+                                <div className="text-center">
+                                    <h2 className="text-3xl font-black text-gray-900 tracking-tight">Create your account</h2>
+                                    <p className="mt-2 text-gray-500 font-medium tracking-tight">
+                                        You selected{' '}
+                                        <span className="text-[#0B3D2E] font-bold capitalize">{roleValue ?? ''}</span>
+                                    </p>
                                 </div>
-
-                                <div>
-                                    <label className="text-sm font-bold text-gray-400 uppercase tracking-widest block mb-2 px-1">Email Address</label>
-                                    <div className="relative">
-                                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                                        <input
-                                            type="email"
-                                            className="w-full pl-12 pr-4 py-4 rounded-2xl border border-gray-100 bg-gray-50/50 focus:ring-4 focus:ring-green-500/10 focus:border-[#0B3D2E] outline-none transition-all font-medium"
-                                            placeholder="john@example.com"
-                                            value={formData.email}
-                                            onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
-                                        />
-                                    </div>
+                                <div className="space-y-6">
+                                    <FormField
+                                        control={signupForm.control}
+                                        name="fullName"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel className="text-sm font-bold text-gray-400 uppercase tracking-widest">Full Name</FormLabel>
+                                                <FormControl>
+                                                    <div className="relative">
+                                                        <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                                        <Input
+                                                            className="w-full pl-12 py-4 rounded-2xl border border-gray-100 bg-gray-50/90 text-gray-900 focus:ring-4 focus:ring-green-500/10 focus:border-[#0B3D2E] outline-none transition dark:bg-gray-50 dark:text-gray-900 dark:border-gray-200"
+                                                            placeholder="John Doe"
+                                                            {...field}
+                                                        />
+                                                    </div>
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={signupForm.control}
+                                        name="email"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel className="text-sm font-bold text-gray-400 uppercase tracking-widest">Email Address</FormLabel>
+                                                <FormControl>
+                                                    <div className="relative">
+                                                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                                        <Input
+                                                            type="email"
+                                                            className="w-full pl-12 py-4 rounded-2xl border border-gray-100 bg-gray-50/90 text-gray-900 focus:ring-4 focus:ring-green-500/10 focus:border-[#0B3D2E] outline-none transition dark:bg-gray-50 dark:text-gray-900 dark:border-gray-200"
+                                                            placeholder="john@example.com"
+                                                            {...field}
+                                                        />
+                                                    </div>
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={signupForm.control}
+                                        name="password"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel className="text-sm font-bold text-gray-400 uppercase tracking-widest">Password</FormLabel>
+                                                <FormControl>
+                                                    <div className="relative">
+                                                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                                        <Input
+                                                            type={showPassword ? 'text' : 'password'}
+                                                            className="w-full pl-12 pr-12 py-4 rounded-2xl border border-gray-100 bg-gray-50/90 text-gray-900 focus:ring-4 focus:ring-green-500/10 focus:border-[#0B3D2E] outline-none transition dark:bg-gray-50 dark:text-gray-900 dark:border-gray-200"
+                                                            placeholder="Minimum 8 characters"
+                                                            {...field}
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setShowPassword((c) => !c)}
+                                                            className="absolute inset-y-0 right-4 flex items-center text-gray-500 hover:text-gray-700"
+                                                            aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                                        >
+                                                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                                        </button>
+                                                    </div>
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
                                 </div>
-
-                                <div>
-                                    <label className="text-sm font-bold text-gray-400 uppercase tracking-widest block mb-2 px-1">Password</label>
-                                    <div className="relative">
-                                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                                        <input
-                                            type={showPassword ? 'text' : 'password'}
-                                            className="w-full pl-12 pr-12 py-4 rounded-2xl border border-gray-100 bg-gray-50/50 focus:ring-4 focus:ring-green-500/10 focus:border-[#0B3D2E] outline-none transition-all font-medium"
-                                            placeholder="Minimum 6 characters"
-                                            value={formData.password}
-                                            onChange={(e) => setFormData((prev) => ({ ...prev, password: e.target.value }))}
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowPassword((current) => !current)}
-                                            className="absolute inset-y-0 right-4 flex items-center text-gray-500 hover:text-gray-700"
-                                            aria-label={showPassword ? 'Hide password' : 'Show password'}
-                                        >
-                                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                        </button>
-                                    </div>
+                                {CAPTCHA_REQUIRED ? (
+                                    <TurnstileWidget
+                                        siteKey={TURNSTILE_SITE_KEY}
+                                        onTokenChange={setCaptchaToken}
+                                        resetSignal={captchaResetSignal}
+                                        className="flex justify-center"
+                                    />
+                                ) : (
+                                    <p className="text-center text-sm text-gray-500">Security check skipped in development.</p>
+                                )}
+                                <div className="flex space-x-4 pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setStep(1)}
+                                        className="flex-1 py-4 rounded-2xl border border-gray-200 font-bold text-gray-500 hover:bg-gray-50 transition"
+                                    >
+                                        Back
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={isCreateDisabled}
+                                        className="flex-[2] py-4 rounded-2xl bg-[#0B3D2E] text-white font-black text-lg hover:shadow-xl hover:shadow-green-900/20 transition disabled:opacity-50"
+                                    >
+                                        {isLoading ? 'Creating Account...' : 'Create Account'}
+                                    </button>
                                 </div>
-                            </div>
-
-                            <TurnstileWidget
-                                siteKey={TURNSTILE_SITE_KEY}
-                                onTokenChange={setCaptchaToken}
-                                resetSignal={captchaResetSignal}
-                                className="flex justify-center"
-                            />
-
-                            <div className="flex space-x-4 pt-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setStep(1)}
-                                    className="flex-1 py-4 rounded-2xl border border-gray-200 font-bold text-gray-500 hover:bg-gray-50 transition"
-                                >
-                                    Back
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={isCreateDisabled}
-                                    className="flex-[2] py-4 rounded-2xl bg-[#0B3D2E] text-white font-black text-lg hover:shadow-xl hover:shadow-green-900/20 transition disabled:opacity-50"
-                                >
-                                    {isLoading ? 'Creating Account...' : 'Create Account'}
-                                </button>
-                            </div>
-                        </form>
+                            </form>
+                        </Form>
                     )}
 
                     <div className="mt-10 text-center">

@@ -8,6 +8,7 @@ import type {
     StartupPost,
     StartupPostStatus,
     StartupProfile,
+    StartupPublicDiscoveryProfile,
     StartupReadiness,
     StartupReadinessSectionScore,
     StartupReadinessStep,
@@ -86,6 +87,7 @@ type StartupPostRow = {
     stage: string | null
     location: string | null
     industry_tags: string[] | null
+    need_advisor?: boolean
     status: string
     published_at: string | null
     updated_at: string
@@ -340,6 +342,7 @@ function mapStartupPost(row: StartupPostRow): StartupPost | null {
         stage: normalizeText(row.stage),
         location: normalizeText(row.location),
         industry_tags: normalizeArray(row.industry_tags),
+        need_advisor: row.need_advisor === true,
         status,
         published_at: normalizeText(row.published_at),
         updated_at: row.updated_at,
@@ -415,6 +418,70 @@ export async function getStartupProfileForCurrentUser(
         return null
     }
     return mapStartupProfile(row)
+}
+
+/** For investor/advisor: fetch a startup's public discovery profile + data room (only for published startups). */
+export async function getStartupPublicDiscoveryProfile(
+    startupOrgId: string
+): Promise<StartupPublicDiscoveryProfile | null> {
+    const accessToken = await getAccessToken(null as any)
+    if (!accessToken) return null
+    const path = `/startups/discovery/${encodeURIComponent(startupOrgId)}/profile`
+    const row = await apiRequest<StartupPublicDiscoveryProfile | null>({
+        path,
+        method: 'GET',
+        accessToken,
+    })
+    if (!row || typeof row !== 'object') return null
+    const r = row as Record<string, unknown>
+    return {
+        startup_org_id: String(r.startup_org_id ?? ''),
+        startup_org_name: String(r.startup_org_name ?? ''),
+        startup_logo_url: typeof r.startup_logo_url === 'string' ? r.startup_logo_url : null,
+        post: mapPublicPost(r.post),
+        profile: mapPublicProfile(r.profile),
+        data_room_documents: Array.isArray(r.data_room_documents)
+            ? r.data_room_documents.map((d: unknown) => mapPublicDoc(d))
+            : [],
+    }
+}
+
+function mapPublicPost(value: unknown): StartupPublicDiscoveryProfile['post'] {
+    const v = value as Record<string, unknown>
+    return {
+        title: String(v?.title ?? ''),
+        summary: String(v?.summary ?? ''),
+        stage: typeof v?.stage === 'string' ? v.stage : null,
+        location: typeof v?.location === 'string' ? v.location : null,
+        industry_tags: Array.isArray(v?.industry_tags) ? v.industry_tags.filter((x): x is string => typeof x === 'string') : [],
+        need_advisor: v?.need_advisor === true,
+    }
+}
+
+function mapPublicProfile(value: unknown): StartupPublicDiscoveryProfile['profile'] {
+    const v = value as Record<string, unknown>
+    return {
+        website_url: typeof v?.website_url === 'string' ? v.website_url : null,
+        team_overview: typeof v?.team_overview === 'string' ? v.team_overview : null,
+        company_stage: typeof v?.company_stage === 'string' ? v.company_stage : null,
+        founding_year: typeof v?.founding_year === 'number' ? v.founding_year : null,
+        team_size: typeof v?.team_size === 'number' ? v.team_size : null,
+        target_market: typeof v?.target_market === 'string' ? v.target_market : null,
+        business_model: typeof v?.business_model === 'string' ? v.business_model : null,
+        traction_summary: typeof v?.traction_summary === 'string' ? v.traction_summary : null,
+    }
+}
+
+function mapPublicDoc(d: unknown): StartupPublicDiscoveryProfile['data_room_documents'][0] {
+    const v = d as Record<string, unknown>
+    return {
+        id: String(v?.id ?? ''),
+        document_type: String(v?.document_type ?? ''),
+        title: String(v?.title ?? ''),
+        file_url: typeof v?.file_url === 'string' ? v.file_url : null,
+        file_name: typeof v?.file_name === 'string' ? v.file_name : null,
+        summary: typeof v?.summary === 'string' ? v.summary : null,
+    }
 }
 
 export async function upsertStartupProfileForCurrentUser(

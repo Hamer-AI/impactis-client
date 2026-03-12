@@ -46,10 +46,11 @@ export default async function OnboardingPage() {
     const user = session.user as any
 
     const hasMembership = await hasOrganizationMembershipForUser(null as any, user, {
-        failOpenOnRequestError: true,
+        // Fail closed to prevent redirect loops when the organizations API is unavailable.
+        failOpenOnRequestError: false,
     })
     if (hasMembership) {
-        redirect(getPostAuthRedirectPath(true))
+        redirect(getPostAuthRedirectPath(true, { skipCache: true }))
     }
 
     const metadata = user.user_metadata as Record<string, unknown> | undefined

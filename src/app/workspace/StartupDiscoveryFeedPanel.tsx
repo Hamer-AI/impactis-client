@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import Link from 'next/link'
 import {
     ArrowRight,
     Bookmark,
@@ -180,9 +181,9 @@ export default function StartupDiscoveryFeedPanel(input: StartupDiscoveryFeedPan
                                     <Badge className="bg-white/80 dark:bg-black/50 backdrop-blur-md border-none px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300">
                                         {item.stage || 'Seed'}
                                     </Badge>
-                                    <button className="flex h-8 w-8 items-center justify-center rounded-full bg-white/80 dark:bg-black/50 backdrop-blur-md text-slate-400 hover:text-emerald-500 transition-colors">
+                                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-white/80 dark:bg-black/50 backdrop-blur-md text-slate-400 hover:text-emerald-500">
                                         <Bookmark className="h-4 w-4" />
-                                    </button>
+                                    </Button>
                                 </div>
 
                                 {/* Brand Avatar */}
@@ -239,9 +240,12 @@ export default function StartupDiscoveryFeedPanel(input: StartupDiscoveryFeedPan
                                     </div>
                                     <Button
                                         variant="ghost"
+                                        asChild
                                         className="h-auto p-0 text-xs font-black uppercase tracking-widest text-emerald-500 hover:text-emerald-400 hover:bg-transparent no-underline"
                                     >
-                                        Explore <ArrowRight className="ml-1 h-3 w-3" />
+                                        <Link href={`/workspace/discovery/${item.startup_org_id}`}>
+                                            Explore <ArrowRight className="ml-1 h-3 w-3" />
+                                        </Link>
                                     </Button>
                                 </div>
                             </div>
@@ -270,7 +274,7 @@ export default function StartupDiscoveryFeedPanel(input: StartupDiscoveryFeedPan
                         <Search className="h-8 w-8 text-slate-300" />
                     </div>
                     <p className="mt-6 text-base font-bold text-slate-500">No matching pipelines found</p>
-                    <button onClick={resetAllFilters} className="mt-2 text-xs font-black uppercase tracking-widest text-emerald-500">Reset Filters</button>
+                    <Button type="button" variant="ghost" onClick={resetAllFilters} className="mt-2 text-xs font-black uppercase tracking-widest text-emerald-500">Reset Filters</Button>
                 </div>
             ) : null}
         </div>

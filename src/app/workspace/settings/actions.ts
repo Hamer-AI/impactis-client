@@ -833,6 +833,7 @@ export async function updateStartupDiscoverySectionAction(
         const startupPostIndustryTagsRaw = normalizeText(formData.get('startupPostIndustryTags')) ?? ''
         const startupPostStatus = normalizeStartupPostStatus(formData.get('startupPostStatus')) ?? 'draft'
         const startupPostIndustryTags = parseIndustryTags(startupPostIndustryTagsRaw)
+        const startupPostNeedAdvisor = formData.get('startupPostNeedAdvisor') === 'on'
 
         if (!startupPostTitle || !startupPostSummary) {
             return { error: 'Startup discovery post requires both title and summary.', success: null }
@@ -853,6 +854,7 @@ export async function updateStartupDiscoverySectionAction(
                 stage: startupPostStage,
                 location: startupPostLocation,
                 industryTags: startupPostIndustryTags,
+                needAdvisor: startupPostNeedAdvisor,
                 status: startupPostStatus,
             },
         })

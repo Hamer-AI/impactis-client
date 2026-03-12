@@ -1,6 +1,6 @@
 'use client'
 
-import { FileText, Rocket } from 'lucide-react'
+import { FileText, Rocket, UserPlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ActionFeedback } from '@/components/ui/action-feedback'
 import { TagEditor } from '../components/TagEditor'
@@ -21,6 +21,7 @@ type DiscoverySectionProps = {
     defaultStartupPostLocation: string
     defaultStartupPostIndustryTags: string
     defaultStartupPostStatus: StartupPostStatus
+    defaultStartupPostNeedAdvisor: boolean
     // Styles
     mutedPanelClass: string
     labelClass: string
@@ -42,6 +43,7 @@ export function DiscoverySection({
     defaultStartupPostLocation,
     defaultStartupPostIndustryTags,
     defaultStartupPostStatus,
+    defaultStartupPostNeedAdvisor,
     mutedPanelClass,
     labelClass,
     inputClass,
@@ -227,6 +229,39 @@ export function DiscoverySection({
                                 {defaultStartupPostStatus === 'published' ? 'Publicly Discoverable' : 'Private Draft'}
                             </div>
                         )}
+
+                {/* Seeking advisor: listed for advisors when enabled */}
+                <div className="grid gap-4 py-8 md:grid-cols-3 md:gap-8">
+                    <div className="md:col-span-1">
+                        <label className={`mb-1.5 block text-xs font-black uppercase tracking-[0.14em] ${labelClass}`}>
+                            Advisor visibility
+                        </label>
+                        <p className={`text-sm font-medium leading-relaxed ${textMutedClass}`}>
+                            When on, your startup is listed and recommended to advisors seeking clients.
+                        </p>
+                    </div>
+                    <div className="md:col-span-2 flex items-center gap-3">
+                        {canEdit ? (
+                            <label className="inline-flex cursor-pointer items-center gap-2">
+                                <input
+                                    type="checkbox"
+                                    name="startupPostNeedAdvisor"
+                                    defaultChecked={defaultStartupPostNeedAdvisor}
+                                    disabled={isPending}
+                                    className="h-4 w-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500"
+                                />
+                                <span className={`text-sm font-bold ${textMainClass}`}>
+                                    Seeking advisor — list us for advisors
+                                </span>
+                            </label>
+                        ) : (
+                            <div className={`flex items-center gap-2 text-sm font-bold ${textMainClass}`}>
+                                <UserPlus className="h-4 w-4 text-emerald-500" />
+                                {defaultStartupPostNeedAdvisor ? 'Listed for advisors' : 'Not listed for advisors'}
+                            </div>
+                        )}
+                    </div>
+                </div>
                     </div>
                 </div>
 

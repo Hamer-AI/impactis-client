@@ -1,11 +1,14 @@
 'use client'
 
+import { useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import Link from 'next/link'
-import { useActionState } from 'react'
 import {
     acceptOrganizationInviteAction,
     type AcceptOrganizationInviteActionState,
 } from './actions'
+import { acceptInviteSchema, type AcceptInviteFormValues } from '@/schemas/invite'
 
 type AcceptInviteFormProps = {
     inviteToken: string
@@ -17,11 +20,30 @@ const initialState: AcceptOrganizationInviteActionState = {
 }
 
 export default function AcceptInviteForm({ inviteToken }: AcceptInviteFormProps) {
-    const [state, formAction, isPending] = useActionState(acceptOrganizationInviteAction, initialState)
+    const [state, setState] = useState<AcceptOrganizationInviteActionState>(initialState)
+    const [isPending, setIsPending] = useState(false)
+
+    const form = useForm<AcceptInviteFormValues>({
+        resolver: zodResolver(acceptInviteSchema),
+        defaultValues: { inviteToken },
+    })
+
+    const onSubmit = async (values: AcceptInviteFormValues) => {
+        setIsPending(true)
+        setState(initialState)
+        try {
+            const formData = new FormData()
+            formData.set('inviteToken', values.inviteToken)
+            const result = await acceptOrganizationInviteAction(initialState, formData)
+            setState(result)
+        } finally {
+            setIsPending(false)
+        }
+    }
 
     return (
-        <form action={formAction} className="mt-6 space-y-4 rounded-2xl border border-gray-200 bg-gray-50 px-5 py-5">
-            <input type="hidden" name="inviteToken" value={inviteToken} />
+        <form onSubmit={form.handleSubmit(onSubmit)} className="mt-6 space-y-4 rounded-2xl border border-gray-200 bg-gray-50 px-5 py-5">
+            <input type="hidden" {...form.register('inviteToken')} />
 
             <p className="text-sm text-gray-600">
                 Accept this invite to join the organization. You can belong to multiple organizations.

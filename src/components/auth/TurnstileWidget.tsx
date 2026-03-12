@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Turnstile, type TurnstileInstance, type TurnstileTheme } from '@marsidev/react-turnstile'
 
 type TurnstileWidgetProps = {
@@ -19,6 +19,9 @@ export default function TurnstileWidget({
     theme = 'light',
 }: TurnstileWidgetProps) {
     const turnstileRef = useRef<TurnstileInstance | null>(null)
+    const [widgetReady, setWidgetReady] = useState(false)
+    const onExpire = useCallback(() => onTokenChange(null), [onTokenChange])
+    const onError = useCallback(() => onTokenChange(null), [onTokenChange])
 
     useEffect(() => {
         const turnstile = turnstileRef.current
@@ -39,14 +42,21 @@ export default function TurnstileWidget({
     }, [onTokenChange, resetSignal])
 
     return (
-        <Turnstile
-            ref={turnstileRef}
-            siteKey={siteKey}
-            className={className}
-            options={{ theme }}
-            onSuccess={onTokenChange}
-            onExpire={() => onTokenChange(null)}
-            onError={() => onTokenChange(null)}
-        />
+        <div className={className} style={{ minHeight: 65 }}>
+            {!widgetReady && (
+                <div className="flex items-center justify-center py-3 text-sm text-gray-500" aria-live="polite">
+                    Loading Cloudflare security check…
+                </div>
+            )}
+            <Turnstile
+                ref={turnstileRef}
+                siteKey={siteKey}
+                options={{ theme }}
+                onSuccess={onTokenChange}
+                onExpire={onExpire}
+                onError={onError}
+                onWidgetLoad={() => setWidgetReady(true)}
+            />
+        </div>
     )
 }

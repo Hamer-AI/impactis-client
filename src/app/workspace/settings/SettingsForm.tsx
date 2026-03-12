@@ -18,6 +18,7 @@ import {
     type SettingsSectionActionState,
 } from './actions'
 
+import { Button } from '@/components/ui/button'
 import { IdentitySection } from './sections/IdentitySection'
 import { ReadinessSection } from './sections/ReadinessSection'
 import { DiscoverySection } from './sections/DiscoverySection'
@@ -48,6 +49,7 @@ type SettingsFormProps = {
     defaultStartupPostLocation: string
     defaultStartupPostIndustryTags: string
     defaultStartupPostStatus: StartupPostStatus
+    defaultStartupPostNeedAdvisor: boolean
     startupReadiness: StartupReadiness | null
     sectionView?: 'identity' | 'readiness' | 'discovery'
     canEdit: boolean
@@ -120,32 +122,32 @@ export default function SettingsForm(props: SettingsFormProps) {
                     <div className={cn('flex items-center gap-1 rounded-xl border p-1',
                         isLight ? 'border-slate-200 bg-slate-100/50' : 'border-white/5 bg-slate-950/40'
                     )}>
-                        <button
+                        <Button
                             type="button"
+                            variant="ghost"
+                            size="sm"
                             onClick={() => setIsEditMode(false)}
                             className={cn(
-                                'flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300',
-                                !isEditMode
-                                    ? 'bg-blue-600 shadow-lg shadow-blue-500/25 text-white'
-                                    : isLight ? 'text-slate-500 hover:text-slate-800' : 'text-slate-400 hover:text-slate-200'
+                                'gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest',
+                                !isEditMode ? 'bg-emerald-500 text-slate-950 hover:bg-emerald-500 hover:text-slate-950' : ''
                             )}
                         >
                             <Eye className="h-3 w-3" />
                             ReadOnly
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             type="button"
+                            variant="ghost"
+                            size="sm"
                             onClick={() => setIsEditMode(true)}
                             className={cn(
-                                'flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300',
-                                isEditMode
-                                    ? 'bg-blue-600 shadow-lg shadow-blue-500/25 text-white'
-                                    : isLight ? 'text-slate-500 hover:text-slate-800' : 'text-slate-400 hover:text-slate-200'
+                                'gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest',
+                                isEditMode ? 'bg-emerald-500 text-slate-950 hover:bg-emerald-500 hover:text-slate-950' : ''
                             )}
                         >
                             <Pencil className="h-3 w-3" />
                             Edit Mode
-                        </button>
+                        </Button>
                     </div>
                 ) : (
                     <div className={cn('flex items-center gap-2 px-4 py-2 rounded-xl border',

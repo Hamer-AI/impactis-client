@@ -1,8 +1,15 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { changePasswordSchema, type ChangePasswordFormValues } from '@/schemas/auth'
+import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
 import {
     AlertTriangle,
     Check,
@@ -65,12 +72,9 @@ function PasswordField(input: {
     return (
         <div className="space-y-2">
             <div className="flex items-center justify-between">
-                <label
-                    htmlFor={input.id}
-                    className={`text-[10px] font-black uppercase tracking-widest ${labelClass}`}
-                >
+                <Label htmlFor={input.id} className={`text-[10px] font-black uppercase tracking-widest ${labelClass}`}>
                     {input.label}
-                </label>
+                </Label>
                 {input.hint && (
                     <span className={`text-[10px] font-medium ${input.isLight ? 'text-slate-400' : 'text-slate-500'}`}>
                         {input.hint}
@@ -81,23 +85,25 @@ function PasswordField(input: {
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
                     <Lock className={`h-3.5 w-3.5 transition-colors ${input.value ? 'text-emerald-500' : input.isLight ? 'text-slate-300' : 'text-slate-600'}`} />
                 </div>
-                <input
+                <Input
                     id={input.id}
                     type={visible ? 'text' : 'password'}
                     value={input.value}
                     onChange={(e) => input.onChange(e.target.value)}
                     placeholder={input.placeholder}
                     autoComplete={input.id === 'current-password' ? 'current-password' : 'new-password'}
-                    className={`w-full rounded-xl border py-3.5 pl-11 pr-12 text-sm font-medium outline-none transition-all duration-200 ${inputClass}`}
+                    className={`w-full rounded-xl border py-3.5 pl-11 pr-12 text-sm font-medium ${inputClass}`}
                 />
-                <button
+                <Button
                     type="button"
+                    variant="ghost"
+                    size="icon"
                     onClick={() => setVisible((v) => !v)}
-                    className={`absolute inset-y-0 right-3 flex items-center transition-colors ${input.isLight ? 'text-slate-300 hover:text-slate-500' : 'text-slate-600 hover:text-slate-400'}`}
+                    className={`absolute inset-y-0 right-3 h-auto w-auto text-slate-400 hover:text-slate-600 ${input.isLight ? 'hover:bg-slate-100' : 'hover:bg-slate-800'}`}
                     aria-label={visible ? 'Hide password' : 'Show password'}
                 >
                     {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
+                </Button>
             </div>
         </div>
     )
@@ -250,15 +256,17 @@ export default function SecuritySection({
     isLight,
 }: SecuritySectionProps) {
     const router = useRouter()
-    const [currentPassword, setCurrentPassword] = useState('')
-    const [newPassword, setNewPassword] = useState('')
-    const [confirmPassword, setConfirmPassword] = useState('')
     const [isUpdating, setIsUpdating] = useState(false)
     const [liveSessions, setLiveSessions] = useState(initialSessions)
     const [revokingId, setRevokingId] = useState<string | null>(null)
     const [isRevokingAll, setIsRevokingAll] = useState(false)
 
-    const strength = getPasswordStrength(newPassword)
+    const form = useForm<ChangePasswordFormValues>({
+        resolver: zodResolver(changePasswordSchema),
+        defaultValues: { currentPassword: '', newPassword: '', confirmPassword: '' },
+    })
+    const newPasswordValue = form.watch('newPassword')
+    const strength = getPasswordStrength(newPasswordValue ?? '')
 
     useEffect(() => {
         let cancelled = false
@@ -313,39 +321,23 @@ export default function SecuritySection({
         }
     }, [])
 
-    async function handleChangePassword(e: React.FormEvent) {
-        e.preventDefault()
-
-        if (newPassword.length < 6) {
-            toast.error('Password must be at least 6 characters.')
-            return
-        }
-
-        if (newPassword !== confirmPassword) {
-            toast.error('New passwords do not match.')
-            return
-        }
-
+    async function onPasswordSubmit(values: ChangePasswordFormValues) {
         if (strength.score <= 1) {
             toast.error('Please choose a stronger password.')
             return
         }
-
         setIsUpdating(true)
         try {
             const { error } = await authClient.changePassword({
-                currentPassword,
-                newPassword,
+                currentPassword: values.currentPassword,
+                newPassword: values.newPassword,
             })
             if (error) {
                 toast.error(error.message || 'Unable to update password.')
                 return
             }
-
             toast.success('Password updated successfully.')
-            setCurrentPassword('')
-            setNewPassword('')
-            setConfirmPassword('')
+            form.reset()
         } catch {
             toast.error('An unexpected error occurred.')
         } finally {
@@ -414,9 +406,11 @@ export default function SecuritySection({
         ? getRelativeTime(new Date(lastSignIn))
         : null
 
-    const passwordsMatch = newPassword.length > 0 && confirmPassword.length > 0 && newPassword === confirmPassword
-    const passwordsMismatch = newPassword.length > 0 && confirmPassword.length > 0 && newPassword !== confirmPassword
-    const canSubmit = !isUpdating && newPassword.length >= 6 && passwordsMatch && strength.score > 1
+    const newPw = form.watch('newPassword') ?? ''
+    const confirmPw = form.watch('confirmPassword') ?? ''
+    const passwordsMatch = newPw.length > 0 && confirmPw.length > 0 && newPw === confirmPw
+    const passwordsMismatch = newPw.length > 0 && confirmPw.length > 0 && newPw !== confirmPw
+    const canSubmit = !isUpdating && form.formState.isValid && passwordsMatch && strength.score > 1
 
     return (
         <div className="space-y-8">
@@ -453,30 +447,50 @@ export default function SecuritySection({
                 description="Update your account password. We recommend using a unique password you don't use elsewhere."
                 isLight={isLight}
             >
-                <form onSubmit={handleChangePassword} className="space-y-6">
-                    <PasswordField
-                        id="current-password"
-                        label="Current Password"
-                        value={currentPassword}
-                        onChange={setCurrentPassword}
-                        placeholder="Enter your current password"
-                        isLight={isLight}
+                <Form {...form}>
+                <form onSubmit={form.handleSubmit(onPasswordSubmit)} className="space-y-6">
+                    <FormField
+                        control={form.control}
+                        name="currentPassword"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormControl>
+                                    <PasswordField
+                                        id="current-password"
+                                        label="Current Password"
+                                        value={field.value}
+                                        onChange={field.onChange}
+                                        placeholder="Enter your current password"
+                                        isLight={isLight}
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
                     />
-
                     <div className={`h-px w-full ${isLight ? 'bg-slate-100' : 'bg-slate-800/60'}`} />
-
-                    <PasswordField
-                        id="new-password"
-                        label="New Password"
-                        value={newPassword}
-                        onChange={setNewPassword}
-                        placeholder="Create a strong new password"
-                        hint={newPassword.length > 0 ? `${newPassword.length} chars` : undefined}
-                        isLight={isLight}
+                    <FormField
+                        control={form.control}
+                        name="newPassword"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormControl>
+                                    <PasswordField
+                                        id="new-password"
+                                        label="New Password"
+                                        value={field.value}
+                                        onChange={field.onChange}
+                                        placeholder="Create a strong new password"
+                                        hint={(field.value?.length ?? 0) > 0 ? `${field.value?.length} chars` : undefined}
+                                        isLight={isLight}
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
                     />
-
                     {/* Strength Meter + Requirements */}
-                    {newPassword.length > 0 && (
+                    {(newPasswordValue?.length ?? 0) > 0 && (
                         <div className={`rounded-2xl border p-5 space-y-4 transition-all duration-500 ${mutedCardClass}`}>
                             {/* Visual Bar */}
                             <div className="space-y-2.5">
@@ -519,13 +533,24 @@ export default function SecuritySection({
                         </div>
                     )}
 
-                    <PasswordField
-                        id="confirm-password"
-                        label="Confirm New Password"
-                        value={confirmPassword}
-                        onChange={setConfirmPassword}
-                        placeholder="Re-enter your new password"
-                        isLight={isLight}
+                    <FormField
+                        control={form.control}
+                        name="confirmPassword"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormControl>
+                                    <PasswordField
+                                        id="confirm-password"
+                                        label="Confirm New Password"
+                                        value={field.value}
+                                        onChange={field.onChange}
+                                        placeholder="Re-enter your new password"
+                                        isLight={isLight}
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
                     />
 
                     {/* Match Indicator */}
@@ -546,10 +571,10 @@ export default function SecuritySection({
                         <p className={`text-[10px] font-medium ${textMutedClass}`}>
                             You&apos;ll stay signed in after updating.
                         </p>
-                        <button
+                        <Button
                             type="submit"
-                            disabled={!canSubmit}
-                            className="flex items-center gap-2.5 rounded-xl bg-emerald-500 px-6 py-3 text-[11px] font-black uppercase tracking-widest text-slate-950 transition-all duration-200 hover:bg-emerald-400 hover:shadow-xl hover:shadow-emerald-500/20 active:scale-[0.97] disabled:opacity-30 disabled:pointer-events-none"
+                            disabled={!canSubmit || isUpdating}
+                            className="gap-2.5 rounded-xl px-6 py-3 text-[11px] font-black uppercase tracking-widest"
                         >
                             {isUpdating ? (
                                 <>
@@ -562,9 +587,10 @@ export default function SecuritySection({
                                     Update Password
                                 </>
                             )}
-                        </button>
+                        </Button>
                     </div>
                 </form>
+                </Form>
             </SectionCard>
 
             {/* ── Active Sessions ──────────────────────────────── */}
@@ -639,13 +665,14 @@ export default function SecuritySection({
                                         </div>
                                     </div>
                                     {!isCurrentDevice && (
-                                        <button
+                                        <Button
                                             type="button"
+                                            variant="outline"
                                             disabled={isRevoking}
                                             onClick={() => handleRevokeSession(sess.id)}
-                                            className={`shrink-0 flex items-center gap-1.5 rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-wider transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:pointer-events-none ${isLight
-                                                ? 'text-rose-600 hover:bg-rose-50 border border-rose-200/60'
-                                                : 'text-rose-400 hover:bg-rose-500/10 border border-rose-500/20'
+                                            className={`shrink-0 gap-1.5 rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-wider ${isLight
+                                                ? 'text-rose-600 border-rose-200/60 hover:bg-rose-50'
+                                                : 'text-rose-400 border-rose-500/20 hover:bg-rose-500/10'
                                                 }`}
                                         >
                                             {isRevoking ? (
@@ -654,7 +681,7 @@ export default function SecuritySection({
                                                 <LogOut className="h-3 w-3" />
                                             )}
                                             Revoke
-                                        </button>
+                                        </Button>
                                     )}
                                 </div>
                             )
@@ -694,13 +721,14 @@ export default function SecuritySection({
                             <p className={`text-[10px] font-medium ${textMutedClass}`}>
                                 {liveSessions.length - 1} other session{liveSessions.length > 2 ? 's' : ''}
                             </p>
-                            <button
+                            <Button
                                 type="button"
+                                variant="outline"
                                 disabled={isRevokingAll}
                                 onClick={handleRevokeAllOtherSessions}
-                                className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:pointer-events-none ${isLight
-                                    ? 'text-rose-600 hover:bg-rose-50 border border-rose-200/60'
-                                    : 'text-rose-400 hover:bg-rose-500/10 border border-rose-500/20'
+                                className={`gap-2 rounded-xl px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider ${isLight
+                                    ? 'text-rose-600 border-rose-200/60 hover:bg-rose-50'
+                                    : 'text-rose-400 border-rose-500/20 hover:bg-rose-500/10'
                                     }`}
                             >
                                 {isRevokingAll ? (
@@ -709,7 +737,7 @@ export default function SecuritySection({
                                     <LogOut className="h-3.5 w-3.5" />
                                 )}
                                 Sign out all other sessions
-                            </button>
+                            </Button>
                         </div>
                     )}
 
@@ -767,15 +795,16 @@ export default function SecuritySection({
                                     </p>
                                 </div>
                             </div>
-                            <button
+                            <Button
                                 disabled
-                                className={`rounded-xl border px-4 py-2.5 text-[10px] font-black uppercase tracking-widest transition-all cursor-not-allowed ${isLight
+                                variant="outline"
+                                className={`rounded-xl px-4 py-2.5 text-[10px] font-black uppercase tracking-widest ${isLight
                                     ? 'border-slate-200 bg-slate-50 text-slate-400'
                                     : 'border-slate-700 bg-slate-800/50 text-slate-500'
                                     }`}
                             >
                                 Coming Soon
-                            </button>
+                            </Button>
                         </div>
 
                         {/* SMS */}
@@ -791,15 +820,16 @@ export default function SecuritySection({
                                     </p>
                                 </div>
                             </div>
-                            <button
+                            <Button
                                 disabled
-                                className={`rounded-xl border px-4 py-2.5 text-[10px] font-black uppercase tracking-widest transition-all cursor-not-allowed ${isLight
+                                variant="outline"
+                                className={`rounded-xl px-4 py-2.5 text-[10px] font-black uppercase tracking-widest ${isLight
                                     ? 'border-slate-200 bg-slate-50 text-slate-400'
                                     : 'border-slate-700 bg-slate-800/50 text-slate-500'
                                     }`}
                             >
                                 Coming Soon
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </div>

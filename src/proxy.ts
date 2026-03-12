@@ -75,7 +75,9 @@ export async function proxy(request: NextRequest) {
             membershipLookupFailed = true
             const message = error instanceof Error ? error.message : 'Unknown membership middleware error'
             console.warn(`[auth-middleware] Membership lookup failed for user ${user.id}: ${message}`)
-            resolvedMembership = true
+            // Fail closed: if we can't verify membership, treat as no membership to avoid
+            // redirect loops between onboarding/workspace when the API is unavailable.
+            resolvedMembership = false
         }
     }
 
@@ -95,7 +97,17 @@ export async function proxy(request: NextRequest) {
         && !membershipLookupFailed
 
     if (decision.type === 'redirect') {
-        url.pathname = decision.destination
+        // decision.destination may include a query string (e.g. "/workspace?refresh=1").
+        // Assigning that to pathname causes Next to encode "?" into "%3F" -> 404.
+        const destination = decision.destination
+        const qIndex = destination.indexOf('?')
+        if (qIndex >= 0) {
+            url.pathname = destination.slice(0, qIndex) || '/'
+            url.search = destination.slice(qIndex)
+        } else {
+            url.pathname = destination
+            url.search = ''
+        }
         const redirectResponse = NextResponse.redirect(url)
         if (shouldWriteMembershipCache && user) {
             writeMembershipCache(redirectResponse, user.id, hasOrganizationMembership)
@@ -111,6 +123,8 @@ export async function proxy(request: NextRequest) {
 
     return nextResponse
 }
+
+export default proxy
 
 export const config = {
     matcher: [

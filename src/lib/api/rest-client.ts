@@ -1,5 +1,19 @@
 const API_URL = process.env.NEXT_PUBLIC_IMPACTIS_API_URL
 const ETAG_CACHE_TTL_MS = 5 * 60 * 1000
+
+/** Use 127.0.0.1 instead of localhost so server-side fetch uses IPv4 and connects reliably to the API. */
+function ensureIPv4ForLocalhost(url: string): string {
+    try {
+        const u = new URL(url)
+        if (u.hostname === 'localhost') {
+            u.hostname = '127.0.0.1'
+            return u.toString()
+        }
+        return url
+    } catch {
+        return url
+    }
+}
 const ETAG_CACHE_MAX_ENTRIES = 1000
 
 type EtagCacheEntry = {
@@ -33,7 +47,8 @@ export function resolveApiBaseUrl(value: string | undefined): string | null {
         return null
     }
 
-    return normalizeApiBasePath(trimmed)
+    const base = normalizeApiBasePath(trimmed)
+    return ensureIPv4ForLocalhost(base)
 }
 
 type ApiMethod = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'

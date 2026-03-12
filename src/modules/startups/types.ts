@@ -87,6 +87,7 @@ export type StartupPost = {
     stage: string | null
     location: string | null
     industry_tags: string[]
+    need_advisor: boolean
     status: StartupPostStatus
     published_at: string | null
     updated_at: string
@@ -103,6 +104,39 @@ export type StartupDiscoveryFeedItem = {
     industry_tags: string[]
     published_at: string | null
     startup_verification_status: StartupDiscoveryVerificationStatus
+    need_advisor: boolean
+}
+
+export type StartupPublicDiscoveryProfile = {
+    startup_org_id: string
+    startup_org_name: string
+    startup_logo_url: string | null
+    post: {
+        title: string
+        summary: string
+        stage: string | null
+        location: string | null
+        industry_tags: string[]
+        need_advisor: boolean
+    }
+    profile: {
+        website_url: string | null
+        team_overview: string | null
+        company_stage: string | null
+        founding_year: number | null
+        team_size: number | null
+        target_market: string | null
+        business_model: string | null
+        traction_summary: string | null
+    }
+    data_room_documents: Array<{
+        id: string
+        document_type: string
+        title: string
+        file_url: string | null
+        file_name: string | null
+        summary: string | null
+    }>
 }
 
 export type StartupDataRoomDocument = {

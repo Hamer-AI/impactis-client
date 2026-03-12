@@ -1,47 +1,51 @@
 'use client'
 
 import { useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { authClient } from '@/lib/auth-client'
 import TurnstileWidget from '@/components/auth/TurnstileWidget'
 import Link from 'next/link'
 import { toast } from 'sonner'
+import { resetPasswordSchema, type ResetPasswordFormValues } from '@/schemas/auth'
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? '0x4AAAAAACd7X251ebzrdbGy'
+const CAPTCHA_REQUIRED = process.env.NODE_ENV === 'production'
 
 export default function ResetPasswordPage() {
-    const [email, setEmail] = useState('')
     const [captchaToken, setCaptchaToken] = useState<string | null>(null)
     const [captchaResetSignal, setCaptchaResetSignal] = useState(0)
     const [isLoading, setIsLoading] = useState(false)
     const [isSent, setIsSent] = useState(false)
 
-    const handleReset = async (e: React.FormEvent) => {
-        e.preventDefault()
+    const form = useForm<ResetPasswordFormValues>({
+        resolver: zodResolver(resetPasswordSchema),
+        defaultValues: { email: '' },
+    })
 
-        if (!captchaToken) {
+    const onSubmit = async (values: ResetPasswordFormValues) => {
+        if (CAPTCHA_REQUIRED && !captchaToken) {
             toast.error('Please complete the security check.')
             return
         }
-
         setIsLoading(true)
-
         try {
             const { error } = await authClient.requestPasswordReset({
-                email,
+                email: values.email,
                 redirectTo: `${window.location.origin}/auth/update-password`,
                 fetchOptions: {
                     headers: {
-                        'x-captcha-response': captchaToken ?? '',
+                        ...(captchaToken ? { 'x-captcha-response': captchaToken } : {}),
                     },
                 },
             })
-
             if (error) {
                 toast.error(error.message ?? 'Unable to send reset link.')
-                setCaptchaResetSignal((current) => current + 1)
+                setCaptchaResetSignal((c) => c + 1)
                 return
             }
-
             toast.success('Reset link sent to your email!')
             setIsSent(true)
         } catch {
@@ -72,40 +76,45 @@ export default function ResetPasswordPage() {
                         </Link>
                     </div>
                 ) : (
-                    <form onSubmit={handleReset} className="space-y-6">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-                            <input
-                                type="email"
-                                required
-                                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-[#0B3D2E] focus:border-transparent outline-none transition"
-                                placeholder="name@company.com"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
+                    <Form {...form}>
+                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                            <FormField
+                                control={form.control}
+                                name="email"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Email Address</FormLabel>
+                                        <FormControl>
+                                            <Input type="email" placeholder="name@company.com" className="px-4 py-3" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
                             />
-                        </div>
-
-                        <TurnstileWidget
-                            siteKey={TURNSTILE_SITE_KEY}
-                            onTokenChange={setCaptchaToken}
-                            resetSignal={captchaResetSignal}
-                            className="flex justify-center"
-                        />
-
-                        <button
-                            type="submit"
-                            disabled={isLoading || !captchaToken}
-                            className="w-full bg-[#0B3D2E] text-white py-3 rounded-xl font-semibold hover:bg-[#082a20] transition disabled:opacity-50"
-                        >
-                            {isLoading ? 'Sending link...' : 'Send Reset Link'}
-                        </button>
-
-                        <div className="text-center">
-                            <Link href="/auth/login" className="font-semibold text-[#0B3D2E] hover:underline">
-                                Back to Sign In
-                            </Link>
-                        </div>
-                    </form>
+                            {CAPTCHA_REQUIRED ? (
+                                <TurnstileWidget
+                                    siteKey={TURNSTILE_SITE_KEY}
+                                    onTokenChange={setCaptchaToken}
+                                    resetSignal={captchaResetSignal}
+                                    className="flex justify-center"
+                                />
+                            ) : (
+                                <p className="text-center text-sm text-gray-500">Security check skipped in development.</p>
+                            )}
+                            <button
+                                type="submit"
+                                disabled={isLoading || (CAPTCHA_REQUIRED && !captchaToken)}
+                                className="w-full bg-[#0B3D2E] text-white py-3 rounded-xl font-semibold hover:bg-[#082a20] transition disabled:opacity-50"
+                            >
+                                {isLoading ? 'Sending link...' : 'Send Reset Link'}
+                            </button>
+                            <div className="text-center">
+                                <Link href="/auth/login" className="font-semibold text-[#0B3D2E] hover:underline">
+                                    Back to Sign In
+                                </Link>
+                            </div>
+                        </form>
+                    </Form>
                 )}
             </div>
         </div>

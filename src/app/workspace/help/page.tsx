@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowLeft, LifeBuoy, Hammer, Construction } from 'lucide-react'
+import { ArrowLeft, LifeBuoy, Hammer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useEffect, useState } from 'react'
 
@@ -20,13 +20,7 @@ export default function HelpUnderConstructionPage() {
         : 'border-white/5 bg-slate-900/40 backdrop-blur-3xl shadow-2xl shadow-blue-500/10'
 
     return (
-        <main className={`flex min-h-screen items-center justify-center p-6 ${isLight ? 'bg-slate-50' : 'bg-[#070b14]'}`}>
-            {/* Ambient Background Elements */}
-            <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-                <div className={`absolute -left-32 -top-32 h-[420px] w-[420px] rounded-full ${isLight ? 'bg-indigo-500/5' : 'bg-indigo-500/10'} blur-[120px]`} />
-                <div className={`absolute right-[-10%] bottom-[-10%] h-[340px] w-[340px] rounded-full ${isLight ? 'bg-blue-400/5' : 'bg-blue-400/5'} blur-[100px]`} />
-            </div>
-
+        <div className="flex flex-1 overflow-y-auto items-center justify-center p-6">
             <div className={`relative z-10 w-full max-w-xl overflow-hidden rounded-[2.5rem] border p-12 text-center transition-all duration-500 ${cardClass}`}>
                 <div className="flex flex-col items-center gap-8">
                     {/* Icon Stack */}
@@ -61,12 +55,12 @@ export default function HelpUnderConstructionPage() {
                     </div>
 
                     <div className="flex flex-col gap-4 sm:flex-row">
-                        <Link href="/workspace">
-                            <Button className="h-12 rounded-2xl bg-indigo-600 px-8 text-xs font-black uppercase tracking-widest text-white shadow-lg shadow-indigo-500/25 transition-all hover:bg-indigo-500 hover:scale-[1.02] active:scale-95">
+                        <Button asChild className="h-12 rounded-2xl bg-indigo-600 px-8 text-xs font-black uppercase tracking-widest text-white shadow-lg shadow-indigo-500/25 transition-all hover:bg-indigo-500 hover:scale-[1.02] active:scale-95">
+                            <Link href="/workspace">
                                 <ArrowLeft className="mr-2 h-4 w-4" />
                                 Back to Dashboard
-                            </Button>
-                        </Link>
+                            </Link>
+                        </Button>
                         <Button variant="outline" className={`h-12 rounded-2xl border-slate-700/50 bg-transparent px-8 text-xs font-black uppercase tracking-widest ${textMainClass} transition-all hover:bg-white/5`}>
                             Contact Support
                         </Button>
@@ -83,6 +77,6 @@ export default function HelpUnderConstructionPage() {
                     animation: spin-slow 12s linear infinite;
                 }
             `}</style>
-        </main>
+        </div>
     )
 }

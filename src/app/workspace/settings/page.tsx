@@ -1,12 +1,7 @@
 import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
 import {
-    ArrowLeft,
-    ArrowUpRight,
-    Bell,
     Building2,
-    ChevronRight,
     CircleDollarSign,
     ClipboardList,
     FolderLock,
@@ -15,13 +10,10 @@ import {
     Settings2,
     ShieldCheck,
     Users,
-    LogOut,
 } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { Badge, type BadgeProps } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { getOnboardingPath } from '@/modules/onboarding'
 import {
     type OrganizationOutgoingInvite,
@@ -45,12 +37,10 @@ import {
     getWorkspaceIdentityForUser,
     getWorkspaceSettingsSnapshotForCurrentUser,
 } from '@/modules/workspace'
-import WorkspaceUserMenu from '../WorkspaceUserMenu'
-import WorkspaceThemeToggle from '../WorkspaceThemeToggle'
 import BillingPlanManager from './BillingPlanManager'
 import DataRoomSection from './DataRoomSection'
 import OrganizationInvitesPanel from './OrganizationInvitesPanel'
-import SettingsSectionNavigator, { type SettingsSectionItem } from './SettingsSectionNavigator'
+import { type SettingsSectionItem } from './SettingsSectionNavigator'
 import SettingsForm from './SettingsForm'
 import PermissionsSection from './sections/PermissionsSection'
 import TeamAccessSection from './sections/TeamAccessSection'
@@ -58,19 +48,6 @@ import ReadinessRulesSection from './sections/ReadinessRulesSection'
 
 function toTitleCase(value: string): string {
     return value.charAt(0).toUpperCase() + value.slice(1)
-}
-
-function getAcronym(value: string): string {
-    const parts = value.trim().split(/\s+/).filter(Boolean)
-    if (parts.length === 0) {
-        return 'O'
-    }
-
-    if (parts.length === 1) {
-        return parts[0].slice(0, 1).toUpperCase()
-    }
-
-    return `${parts[0].slice(0, 1)}${parts[1].slice(0, 1)}`.toUpperCase()
 }
 
 function resolveSingleSearchParam(value: string | string[] | undefined): string | null {
@@ -132,31 +109,6 @@ function getVerificationMeta(status: OrganizationVerificationStatus): {
     return { label: 'Unverified', variant: 'secondary' }
 }
 
-function formatDateLabel(value: string): string {
-    const parsed = Date.parse(value)
-    if (Number.isNaN(parsed)) {
-        return 'Not scheduled'
-    }
-
-    return new Date(parsed).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: '2-digit',
-    })
-}
-
-function formatCurrencyFromCents(cents: number | null, currency: string): string | null {
-    if (typeof cents !== 'number' || Number.isNaN(cents)) {
-        return null
-    }
-
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency,
-        maximumFractionDigits: cents % 100 === 0 ? 0 : 2,
-    }).format(cents / 100)
-}
-
 function normalizeNullableInteger(value: unknown): number | null {
     if (typeof value === 'number' && Number.isFinite(value)) {
         return Math.round(value)
@@ -170,28 +122,6 @@ function normalizeNullableInteger(value: unknown): number | null {
     }
 
     return null
-}
-
-function getSubscriptionStatusMeta(
-    status: BillingCurrentPlanSnapshot['subscription']['status']
-): { label: string; variant: BadgeProps['variant'] } {
-    if (status === 'active' || status === 'trialing') {
-        return { label: status === 'trialing' ? 'Trialing' : 'Active', variant: 'success' }
-    }
-
-    if (status === 'past_due' || status === 'incomplete') {
-        return { label: status === 'past_due' ? 'Past Due' : 'Incomplete', variant: 'warning' }
-    }
-
-    if (status === 'canceled') {
-        return { label: 'Canceled', variant: 'destructive' }
-    }
-
-    if (status === 'paused') {
-        return { label: 'Paused', variant: 'secondary' }
-    }
-
-    return { label: 'Unknown', variant: 'secondary' }
 }
 
 function getSectionPresentation(sectionId: string): {
@@ -278,74 +208,6 @@ function getSectionPresentation(sectionId: string): {
         badgeVariant: 'secondary',
         icon: Building2,
     }
-}
-
-function CurrentPlanSidebarCard(input: {
-    currentPlan: BillingCurrentPlanSnapshot | null
-    isLight: boolean
-    panelClass: string
-    mutedPanelClass: string
-    textMainClass: string
-    textMutedClass: string
-}) {
-    if (!input.currentPlan) {
-        return (
-            <div className={`flex flex-col gap-3 rounded-[2.5rem] border p-6 ${input.panelClass} backdrop-blur-xl`}>
-                <div className="flex items-center justify-between">
-                    <p className={`text-xs font-black uppercase tracking-widest ${input.textMainClass}`}>Current Plan</p>
-                    <Badge variant="secondary" className="rounded-lg px-2 py-0 text-[10px] font-black uppercase">
-                        Missing
-                    </Badge>
-                </div>
-                <p className={`text-sm leading-relaxed ${input.textMutedClass}`}>
-                    No subscription record was found for this organization.
-                </p>
-            </div>
-        )
-    }
-
-    const statusMeta = getSubscriptionStatusMeta(input.currentPlan.subscription.status)
-    const billingInterval = input.currentPlan.subscription.billing_interval ?? 'monthly'
-    const billedAmountCents = billingInterval === 'annual'
-        ? (input.currentPlan.plan.annual_price_cents ?? input.currentPlan.plan.monthly_price_cents)
-        : (input.currentPlan.plan.monthly_price_cents ?? input.currentPlan.plan.annual_price_cents)
-    const billedAmountLabel = formatCurrencyFromCents(
-        billedAmountCents,
-        input.currentPlan.plan.currency
-    ) ?? 'Custom'
-    const renewalLabel = input.currentPlan.subscription.current_period_end
-        ? formatDateLabel(input.currentPlan.subscription.current_period_end)
-        : 'Not scheduled'
-
-    return (
-        <div className="flex flex-col gap-3 px-4">
-            <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5 min-w-0">
-                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${input.isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-950 border-slate-800'}`}>
-                        <CircleDollarSign className="h-4 w-4 text-emerald-500" />
-                    </div>
-                    <div className="min-w-0">
-                        <p className={`text-[10px] font-black uppercase tracking-widest opacity-60 ${input.textMutedClass}`}>Current Tier</p>
-                        <p className={`text-xs font-black truncate tracking-tight ${input.textMainClass}`}>{input.currentPlan.plan.name}</p>
-                    </div>
-                </div>
-                <Badge variant={statusMeta.variant} className="rounded-md px-1.5 h-4 text-[9px] font-black uppercase tracking-tighter">
-                    {statusMeta.label}
-                </Badge>
-            </div>
-
-            <Link
-                href="/workspace/settings?section=settings-billing"
-                className={`group flex items-center justify-between rounded-xl border px-3 py-2 transition-all ${input.isLight
-                    ? 'border-slate-200 bg-white/50 hover:border-slate-300 hover:bg-white'
-                    : 'border-slate-800 bg-slate-950/40 hover:border-slate-700 hover:bg-slate-950'
-                    }`}
-            >
-                <span className={`text-[10px] font-black uppercase tracking-widest ${input.textMutedClass} group-hover:text-emerald-500 transition-colors`}>Manage Subscription</span>
-                <ArrowUpRight className="h-3 w-3 text-slate-400 group-hover:text-emerald-500 transition-colors" />
-            </Link>
-        </div>
-    )
 }
 
 export default async function WorkspaceSettingsPage({
@@ -566,198 +428,13 @@ export default async function WorkspaceSettingsPage({
             : 'identity'
 
     return (
-        <main data-workspace-root="true" className={`flex h-screen w-full overflow-hidden ${pageShellClass}`}>
-            {/* ═══════════════════ Professional Sidebar ═══════════════════ */}
-            <aside className={`relative flex w-[310px] shrink-0 flex-col overflow-hidden z-20 ${isLight
-                ? 'border-r border-slate-200/80 bg-white'
-                : 'border-r border-white/[0.04] bg-[#0a0e1a]'
-                }`}>
-                {/* Ambient gradient */}
-                <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-                    <div className={`absolute -left-20 -top-20 h-[280px] w-[280px] rounded-full blur-[100px] ${isLight ? 'bg-emerald-500/[0.04]' : 'bg-emerald-500/[0.06]'}`} />
-                    <div className={`absolute -bottom-16 -right-16 h-[200px] w-[200px] rounded-full blur-[80px] ${isLight ? 'bg-blue-500/[0.03]' : 'bg-blue-500/[0.04]'}`} />
-                </div>
-
-                {/* ─── Header ─── */}
-                <div className={`relative p-6 pb-5 ${isLight ? 'border-b border-slate-100' : 'border-b border-white/[0.04]'}`}>
-                    {/* Back Link */}
-                    <Link
-                        href="/workspace"
-                        className={`group mb-6 inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest transition-all duration-200 ${isLight
-                            ? 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'
-                            : 'text-slate-500 hover:bg-slate-800/50 hover:text-slate-300'
-                            }`}
-                    >
-                        <ArrowLeft className="h-3 w-3 transition-transform group-hover:-translate-x-0.5" />
-                        Workspace
-                    </Link>
-
-                    {/* Organization Identity */}
-                    <div className="flex items-center gap-4">
-                        <div className="relative">
-                            <Avatar className={`h-11 w-11 ring-2 ${isLight ? 'ring-slate-200' : 'ring-slate-800'}`}>
-                                <AvatarImage src={membership.organization.logo_url ?? undefined} alt="Org logo" />
-                                <AvatarFallback className={`text-xs font-black ${isLight ? 'bg-gradient-to-br from-slate-100 to-slate-50 text-slate-400' : 'bg-gradient-to-br from-slate-800 to-slate-900 text-slate-500'}`}>
-                                    {getAcronym(membership.organization.name)}
-                                </AvatarFallback>
-                            </Avatar>
-                            <div className={`absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full border-2 ${isLight ? 'border-white bg-slate-100' : 'border-[#0a0e1a] bg-slate-800'}`}>
-                                <Building2 className={`h-2.5 w-2.5 ${textMutedClass}`} />
-                            </div>
-                        </div>
-                        <div className="min-w-0 flex-1">
-                            <h1 className={`text-[15px] font-black tracking-tight truncate ${textMainClass}`}>
-                                {membership.organization.name}
-                            </h1>
-                            <div className="flex items-center gap-2 mt-0.5">
-                                <Badge variant={verificationMeta.variant} className="rounded-md px-1.5 py-0 text-[9px] font-black uppercase tracking-wider">
-                                    {verificationMeta.label}
-                                </Badge>
-                                <span className={`text-[10px] font-bold uppercase tracking-widest ${textMutedClass}`}>
-                                    {toTitleCase(membership.member_role)}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* ─── Navigation ─── */}
-                <div className="relative flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 ws-sidebar-scroll">
-                    <div className="space-y-8">
-                        <div>
-                            <p className={`mb-4 px-3 text-[9px] font-black uppercase tracking-[0.25em] ${textMutedClass} opacity-60`}>
-                                Organization Settings
-                            </p>
-                            <SettingsSectionNavigator
-                                sections={settingsProperties}
-                                isLight={isLight}
-                            />
-                        </div>
-
-                        {/* ─── Intelligence Section ─── */}
-                        <div className={`h-px w-full ${isLight ? 'bg-slate-100' : 'bg-white/[0.04]'}`} />
-
-                        <div className="space-y-5">
-                            <p className={`px-3 text-[9px] font-black uppercase tracking-[0.25em] ${textMutedClass} opacity-60`}>
-                                Intelligence
-                            </p>
-
-                            {/* Current Plan Card */}
-                            <CurrentPlanSidebarCard
-                                currentPlan={currentPlan}
-                                isLight={isLight}
-                                panelClass="border-none bg-transparent shadow-none p-0 rounded-none"
-                                mutedPanelClass={mutedPanelClass}
-                                textMainClass={textMainClass}
-                                textMutedClass={textMutedClass}
-                            />
-
-                            {/* Readiness Intelligence (Startups Only) */}
-                            {isStartupOrganization && (
-                                <>
-                                    <div className={`h-px w-full ${isLight ? 'bg-slate-100' : 'bg-white/[0.04]'}`} />
-                                    <div className="space-y-3 px-3 py-1">
-                                        <div className="flex items-center justify-between gap-2">
-                                            <div className="flex items-center gap-2.5">
-                                                <div className={`flex h-7 w-7 items-center justify-center rounded-lg ${isLight ? 'bg-blue-50 border border-blue-100' : 'bg-blue-500/10 border border-blue-500/20'}`}>
-                                                    <Gauge className="h-3.5 w-3.5 text-blue-500" />
-                                                </div>
-                                                <span className={`text-[10px] font-black uppercase tracking-widest ${textMainClass}`}>Readiness</span>
-                                            </div>
-                                            <Badge variant={readinessStatusVariant} className="rounded-md px-1.5 h-4 text-[9px] font-black uppercase tracking-tighter">
-                                                {readinessStatusLabel}
-                                            </Badge>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <div className="flex items-center justify-between">
-                                                <div className={`h-2 flex-1 overflow-hidden rounded-full ${isLight ? 'bg-slate-100' : 'bg-slate-800'}`}>
-                                                    <div
-                                                        className="h-full rounded-full bg-emerald-500 transition-all duration-1000 ws-shimmer"
-                                                        style={{ width: `${readinessScoreForBar}%` }}
-                                                    />
-                                                </div>
-                                                <span className={`ml-3 text-[11px] font-black tracking-tight ${textMainClass}`}>
-                                                    {readinessScore === null ? 'N/A' : `${readinessScore}%`}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* ─── Footer Action ─── */}
-                <div className={`relative p-4 ${isLight ? 'border-t border-slate-100' : 'border-t border-white/[0.04]'}`}>
-                    <form action="/auth/signout" method="post">
-                        <button
-                            type="submit"
-                            className={`group flex w-full items-center gap-3.5 rounded-2xl px-4 py-3.5 transition-all duration-300 ${isLight
-                                ? 'border border-rose-100 bg-rose-50/30 text-rose-600 hover:bg-rose-50 hover:border-rose-200 hover:shadow-sm'
-                                : 'border border-rose-500/10 bg-rose-500/[0.02] text-rose-400 hover:bg-rose-500/[0.06] hover:border-rose-500/20 hover:shadow-lg hover:shadow-rose-900/5'
-                                }`}
-                        >
-                            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-all duration-300 ${isLight
-                                ? 'bg-rose-100/80 group-hover:bg-rose-100'
-                                : 'bg-rose-500/10 group-hover:bg-rose-500/20'
-                                }`}>
-                                <LogOut className="h-4 w-4" />
-                            </div>
-                            <div className="flex-1 text-left">
-                                <p className="text-[12px] font-black uppercase tracking-widest">
-                                    Sign Out
-                                </p>
-                                <p className={`text-[10px] font-medium opacity-60 ${isLight ? 'text-rose-500' : 'text-rose-300'}`}>
-                                    End current session
-                                </p>
-                            </div>
-                            <ChevronRight className={`h-3.5 w-3.5 opacity-40 transition-transform group-hover:translate-x-0.5 ${isLight ? 'text-rose-400' : 'text-rose-500'}`} />
-                        </button>
-                    </form>
-                </div>
-            </aside>
-
-            {/* Main Content Area */}
             <section className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
                 {/* Top Ambient Light */}
                 <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
                     <div className={`absolute -right-32 -top-32 h-[420px] w-[420px] rounded-full ${isLight ? 'bg-blue-500/5' : 'bg-blue-500/10'} blur-[120px]`} />
                 </div>
 
-                {/* Content Header: Workspace Navbar */}
-                <header className={`sticky top-0 z-30 flex h-20 shrink-0 items-center justify-between border-b px-8 backdrop-blur-3xl ${isLight ? 'border-slate-200 bg-white' : 'border-white/5 bg-[#070b14]/40'}`}>
-                    <div className="flex items-center gap-4">
-                        <nav className="flex items-center gap-3 text-xs font-black uppercase tracking-[0.2em] text-slate-500">
-                            <span className="opacity-40">Workspace</span>
-                            <span className="opacity-20">/</span>
-                            <span className="opacity-40">Settings</span>
-                            <span className="opacity-20">/</span>
-                            <span className={textMainClass}>{activeSectionPresentation.title}</span>
-                        </nav>
-                    </div>
-
-                    <div className="flex items-center gap-6">
-                        <div className="flex items-center gap-4 border-r border-slate-200/20 pr-6 mr-2 dark:border-white/5">
-                            <button className="relative p-2 text-slate-400 transition-colors hover:text-emerald-500">
-                                <Bell className="h-5 w-5" />
-                                <div className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
-                            </button>
-                            <WorkspaceThemeToggle />
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                            <WorkspaceUserMenu
-                                displayName={profile?.full_name?.trim() || membership.organization.name}
-                                email={user?.email ?? null}
-                                avatarUrl={profile?.avatar_url}
-                                isLight={isLight}
-                            />
-                        </div>
-                    </div>
-                </header>
-
-                {/* Content Body: Scrollable Forms */}
+                {/* Content Body: Scrollable Forms (header provided by workspace layout) */}
                 <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 scroll-smooth">
                     <div className="mx-auto max-w-4xl space-y-8">
                         {isOrganizationEditorSection ? (
@@ -787,6 +464,7 @@ export default async function WorkspaceSettingsPage({
                                 defaultStartupPostLocation={startupPost?.location ?? ''}
                                 defaultStartupPostIndustryTags={startupPost?.industry_tags.join(', ') ?? ''}
                                 defaultStartupPostStatus={startupPost?.status ?? 'draft'}
+                                defaultStartupPostNeedAdvisor={startupPost?.need_advisor ?? false}
                                 startupReadiness={startupReadiness}
                                 sectionView={settingsFormSectionView}
                                 canEdit={canEdit}
@@ -870,6 +548,5 @@ export default async function WorkspaceSettingsPage({
                     </div>
                 </div>
             </section>
-        </main>
     )
 }

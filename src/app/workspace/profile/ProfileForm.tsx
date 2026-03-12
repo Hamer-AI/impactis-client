@@ -1,14 +1,21 @@
 'use client'
 
-import { useActionState, useState, ChangeEvent, useEffect, MouseEvent } from 'react'
+import { useState, ChangeEvent, useEffect, MouseEvent } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { ActionFeedback } from '@/components/ui/action-feedback'
 import { Pencil, MapPin, Trash2 } from 'lucide-react'
+import { workspaceKeys } from '@/lib/query-keys'
 import { useTransientActionNotice } from '@/lib/use-transient-action-notice'
 import { updateProfileAction, type UpdateProfileActionState } from './actions'
+
+const initialState: UpdateProfileActionState = { error: null, success: null }
 
 type ProfileFormProps = {
     defaultEmail: string
@@ -23,11 +30,6 @@ type ProfileFormProps = {
     defaultTimezoneName: string
     defaultPreferredContactMethod: string
     isLight?: boolean
-}
-
-const initialState: UpdateProfileActionState = {
-    error: null,
-    success: null,
 }
 
 function toTitleCase(value: string): string {
@@ -49,7 +51,17 @@ export default function ProfileForm({
     defaultPreferredContactMethod,
     isLight = true,
 }: ProfileFormProps) {
-    const [state, formAction, isPending] = useActionState(updateProfileAction, initialState)
+    const queryClient = useQueryClient()
+    const mutation = useMutation({
+        mutationFn: (formData: FormData) => updateProfileAction(initialState, formData),
+        onSuccess: (data: UpdateProfileActionState | undefined) => {
+            if (data?.success) {
+                queryClient.invalidateQueries({ queryKey: workspaceKeys.identity() })
+            }
+        },
+    })
+    const state = mutation.data ?? initialState
+    const isPending = mutation.isPending
     const notice = useTransientActionNotice(state)
     const [editingPersonalInfo, setEditingPersonalInfo] = useState(false)
     const [editingLocation, setEditingLocation] = useState(false)
@@ -148,7 +160,13 @@ export default function ProfileForm({
         <div className="space-y-8">
             <h1 className={`text-2xl font-bold ${sectionTitleClass}`}>Edit Profile</h1>
 
-            <form action={formAction} className="space-y-8">
+            <form
+                className="space-y-8"
+                onSubmit={(e) => {
+                    e.preventDefault()
+                    mutation.mutate(new FormData(e.currentTarget))
+                }}
+            >
             <input type="hidden" name="avatarCurrentUrl" value={currentAvatarUrl} />
 
             {/* Profile photo */}
@@ -229,48 +247,31 @@ export default function ProfileForm({
                     <div className="flex items-center justify-between">
                         <h2 className={`text-base font-semibold ${sectionTitleClass}`}>Personal Info</h2>
                         {!editingPersonalInfo ? (
-                            <button type="button" onClick={() => setEditingPersonalInfo(true)} className={`flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-medium ${textMutedClass} hover:opacity-80`}>
+                            <Button type="button" variant="ghost" size="sm" onClick={() => setEditingPersonalInfo(true)} className={textMutedClass}>
                                 <Pencil className="h-4 w-4" /> Edit
-                            </button>
+                            </Button>
                         ) : null}
                     </div>
                     {editingPersonalInfo ? (
                         <div className="mt-4 space-y-4">
                             <div className="grid gap-3 sm:grid-cols-2">
-                                <div>
-                                    <label className={`block text-xs font-medium ${labelClass}`}>Full Name</label>
-                                    <input
-                                        name="fullName"
-                                        value={fullName}
-                                        onChange={(event) => setFullName(event.target.value)}
-                                        className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm ${inputClass}`}
-                                    />
+                                <div className="space-y-2">
+                                    <Label className={labelClass}>Full Name</Label>
+                                    <Input name="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} className={inputClass} />
                                 </div>
-                                <div>
-                                    <label className={`block text-xs font-medium ${labelClass}`}>Phone</label>
-                                    <input
-                                        name="phone"
-                                        value={phone}
-                                        onChange={(event) => setPhone(event.target.value)}
-                                        placeholder="(219) 555-0114"
-                                        className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm ${inputClass}`}
-                                    />
+                                <div className="space-y-2">
+                                    <Label className={labelClass}>Phone</Label>
+                                    <Input name="phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(219) 555-0114" className={inputClass} />
                                 </div>
                             </div>
-                            <div className="mt-3">
-                                <label className={`block text-xs font-medium ${labelClass}`}>Headline / Profession</label>
-                                <input
-                                    name="headline"
-                                    value={headline}
-                                    onChange={(event) => setHeadline(event.target.value)}
-                                    placeholder="e.g. Product Manager at Impactis"
-                                    className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm ${inputClass}`}
-                                />
+                            <div className="mt-3 space-y-2">
+                                <Label className={labelClass}>Headline / Profession</Label>
+                                <Input name="headline" value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="e.g. Product Manager at Impactis" className={inputClass} />
                             </div>
                             <p className={`text-xs ${textMutedClass}`}>Email is from your account.</p>
                             <div className="flex gap-2">
                                 <Button type="button" variant="outline" onClick={() => setEditingPersonalInfo(false)} className="rounded-xl">Cancel</Button>
-                                <Button type="submit" disabled={isPending} className="rounded-xl bg-blue-600 hover:bg-blue-700">Save changes</Button>
+                                <Button type="submit" disabled={isPending} className="rounded-xl">Save changes</Button>
                             </div>
                         </div>
                     ) : (
@@ -290,49 +291,34 @@ export default function ProfileForm({
                     <div className="flex items-center justify-between">
                         <h2 className={`text-base font-semibold ${sectionTitleClass}`}>Location</h2>
                         {!editingLocation ? (
-                            <button
-                                type="button"
-                                onClick={() => setEditingLocation(true)}
-                                className={`flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-medium ${textMutedClass} hover:opacity-80`}
-                            >
+                            <Button type="button" variant="ghost" size="sm" onClick={() => setEditingLocation(true)} className={textMutedClass}>
                                 <Pencil className="h-4 w-4" /> Edit
-                            </button>
+                            </Button>
                         ) : null}
                     </div>
 
                     {editingLocation ? (
                         <div className="mt-4 flex flex-wrap items-end gap-3">
-                            <div className="flex-1 min-w-[200px]">
-                                <label htmlFor="location" className="sr-only">
-                                    Location
-                                </label>
-                                <div
-                                    className={`flex rounded-xl border ${
-                                        isLight ? 'border-slate-200 bg-white' : 'border-slate-700 bg-slate-950'
-                                    }`}
-                                >
+                            <div className="flex-1 min-w-[200px] space-y-2">
+                                <Label htmlFor="location" className={labelClass}>Location</Label>
+                                <div className={`flex rounded-xl border ${isLight ? 'border-slate-200 bg-white' : 'border-slate-700 bg-slate-950'}`}>
                                     <span className={`flex items-center pl-3 ${textMutedClass}`}>
                                         <MapPin className="h-4 w-4" />
                                     </span>
-                                    <input
+                                    <Input
                                         id="location"
                                         name="location"
                                         value={location}
-                                        onChange={(event) => setLocation(event.target.value)}
+                                        onChange={(e) => setLocation(e.target.value)}
                                         placeholder="e.g. California"
-                                        className={`flex-1 border-0 bg-transparent px-3 py-2.5 text-sm outline-none ${textMainClass}`}
+                                        className={`flex-1 border-0 bg-transparent shadow-none focus-visible:ring-0 ${textMainClass}`}
                                     />
                                 </div>
                             </div>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                className="rounded-xl"
-                                onClick={() => setEditingLocation(false)}
-                            >
+                            <Button type="button" variant="outline" className="rounded-xl" onClick={() => setEditingLocation(false)}>
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={isPending} className="rounded-xl bg-blue-600 hover:bg-blue-700">
+                            <Button type="submit" disabled={isPending} className="rounded-xl">
                                 Save changes
                             </Button>
                         </div>
@@ -353,60 +339,38 @@ export default function ProfileForm({
                     <div className="flex items-center justify-between">
                         <h2 className={`text-base font-semibold ${sectionTitleClass}`}>Contact & links</h2>
                         {!editingContacts ? (
-                            <button
-                                type="button"
-                                onClick={() => setEditingContacts(true)}
-                                className={`flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-medium ${textMutedClass} hover:opacity-80`}
-                            >
+                            <Button type="button" variant="ghost" size="sm" onClick={() => setEditingContacts(true)} className={textMutedClass}>
                                 <Pencil className="h-4 w-4" /> Edit
-                            </button>
+                            </Button>
                         ) : null}
                     </div>
 
                     {editingContacts ? (
                         <div className="mt-4 space-y-4">
                             <div className="grid gap-3 md:grid-cols-2">
-                                <div>
-                                    <label className={`block text-xs font-medium ${labelClass}`}>Website URL</label>
-                                    <input
-                                        name="websiteUrl"
-                                        value={websiteUrl}
-                                        onChange={(event) => setWebsiteUrl(event.target.value)}
-                                        placeholder="https://example.com"
-                                        className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm ${inputClass}`}
-                                    />
+                                <div className="space-y-2">
+                                    <Label className={labelClass}>Website URL</Label>
+                                    <Input name="websiteUrl" value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} placeholder="https://example.com" className={inputClass} />
                                 </div>
-                                <div>
-                                    <label className={`block text-xs font-medium ${labelClass}`}>LinkedIn URL</label>
-                                    <input
-                                        name="linkedinUrl"
-                                        value={linkedinUrl}
-                                        onChange={(event) => setLinkedinUrl(event.target.value)}
-                                        placeholder="https://www.linkedin.com/in/your-handle"
-                                        className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm ${inputClass}`}
-                                    />
+                                <div className="space-y-2">
+                                    <Label className={labelClass}>LinkedIn URL</Label>
+                                    <Input name="linkedinUrl" value={linkedinUrl} onChange={(e) => setLinkedinUrl(e.target.value)} placeholder="https://www.linkedin.com/in/your-handle" className={inputClass} />
                                 </div>
                             </div>
 
                             <div className="grid gap-3 md:grid-cols-2">
-                                <div>
-                                    <label className={`block text-xs font-medium ${labelClass}`}>Timezone</label>
-                                    <input
-                                        name="timezoneName"
-                                        value={timezoneName}
-                                        onChange={(event) => setTimezoneName(event.target.value)}
-                                        placeholder="e.g. Africa/Addis_Ababa"
-                                        className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm ${inputClass}`}
-                                    />
-                                    <p className={`mt-1 text-[11px] ${textMutedClass}`}>Use IANA format (e.g. Europe/London).</p>
+                                <div className="space-y-2">
+                                    <Label className={labelClass}>Timezone</Label>
+                                    <Input name="timezoneName" value={timezoneName} onChange={(e) => setTimezoneName(e.target.value)} placeholder="e.g. Africa/Addis_Ababa" className={inputClass} />
+                                    <p className={`text-[11px] ${textMutedClass}`}>Use IANA format (e.g. Europe/London).</p>
                                 </div>
-                                <div>
-                                    <label className={`block text-xs font-medium ${labelClass}`}>Preferred contact</label>
+                                <div className="space-y-2">
+                                    <Label className={labelClass}>Preferred contact</Label>
                                     <select
                                         name="preferredContactMethod"
                                         value={preferredContactMethod}
                                         onChange={(event) => setPreferredContactMethod(event.target.value)}
-                                        className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm ${selectClass}`}
+                                        className={`flex h-10 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 ${selectClass}`}
                                     >
                                         <option value="">No preference</option>
                                         <option value="email">Email</option>
@@ -417,15 +381,10 @@ export default function ProfileForm({
                             </div>
 
                             <div className="flex gap-2">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    className="rounded-xl"
-                                    onClick={() => setEditingContacts(false)}
-                                >
+                                <Button type="button" variant="outline" className="rounded-xl" onClick={() => setEditingContacts(false)}>
                                     Cancel
                                 </Button>
-                                <Button type="submit" disabled={isPending} className="rounded-xl bg-blue-600 hover:bg-blue-700">
+                                <Button type="submit" disabled={isPending} className="rounded-xl">
                                     Save changes
                                 </Button>
                             </div>
@@ -470,24 +429,24 @@ export default function ProfileForm({
                     <div className="flex items-center justify-between">
                         <h2 className={`text-base font-semibold ${sectionTitleClass}`}>Bio</h2>
                         {!editingBio ? (
-                            <button type="button" onClick={() => setEditingBio(true)} className={`flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-medium ${textMutedClass} hover:opacity-80`}>
+                            <Button type="button" variant="ghost" size="sm" onClick={() => setEditingBio(true)} className={textMutedClass}>
                                 <Pencil className="h-4 w-4" /> Edit
-                            </button>
+                            </Button>
                         ) : null}
                     </div>
                     {editingBio ? (
                         <div className="mt-4 space-y-4">
-                            <textarea
+                            <Textarea
                                 name="bio"
                                 value={bio}
-                                onChange={(event) => setBio(event.target.value)}
+                                onChange={(e) => setBio(e.target.value)}
                                 rows={4}
                                 placeholder="Write a short bio..."
-                                className={`w-full resize-none rounded-xl border px-3 py-2 text-sm ${inputClass}`}
+                                className={inputClass}
                             />
                             <div className="flex gap-2">
                                 <Button type="button" variant="outline" onClick={() => setEditingBio(false)} className="rounded-xl">Cancel</Button>
-                                <Button type="submit" disabled={isPending} className="rounded-xl bg-blue-600 hover:bg-blue-700">Save changes</Button>
+                                <Button type="submit" disabled={isPending} className="rounded-xl">Save changes</Button>
                             </div>
                         </div>
                     ) : (

@@ -474,6 +474,7 @@ function mapStartupDiscoveryFeedItem(value: unknown): StartupDiscoveryFeedItem |
         return null
     }
 
+    const needAdvisor = row.need_advisor === true
     return {
         id,
         startup_org_id: startupOrgId,
@@ -487,6 +488,7 @@ function mapStartupDiscoveryFeedItem(value: unknown): StartupDiscoveryFeedItem |
         startup_verification_status: normalizeStartupDiscoveryVerificationStatus(
             row.startup_verification_status
         ),
+        need_advisor: needAdvisor,
     }
 }
 
@@ -548,17 +550,39 @@ export async function getWorkspaceIdentityForUser(
     return snapshot
 }
 
+function buildSnapshotFromBootstrapResponse(
+    data: WorkspaceBootstrapApiResponse,
+    userId: string
+): WorkspaceBootstrapSnapshot {
+    return {
+        profile: mapProfile(data.profile, userId),
+        membership: mapMembership(data.membership),
+        verification_status: normalizeOrganizationVerificationStatus(data.verification_status),
+        current_plan: mapBillingCurrentPlan(data.current_plan),
+        organization_core_team: mapArray(data.organization_core_team, mapOrganizationCoreTeamMember),
+        organization_readiness: mapOrganizationReadiness(data.organization_readiness),
+        startup_discovery_feed: mapArray(data.startup_discovery_feed, mapStartupDiscoveryFeedItem),
+        startup_readiness: mapStartupReadiness(data.startup_readiness),
+    }
+}
+
 export async function getWorkspaceBootstrapForCurrentUser(
     supabase: SupabaseClient,
     user: User,
     input?: {
         accessToken?: string | null
+        /** When true, skip cache so the next request always hits the API (e.g. after "Try again"). */
+        skipCache?: boolean
+        /** When direct API fails, try fetching via Next.js proxy (same-origin). */
+        proxyOptions?: { cookieHeader: string; appOrigin: string }
     }
 ): Promise<WorkspaceBootstrapSnapshot> {
     const cacheKey = `bootstrap:${user.id}`
-    const cached = getCacheEntryValue(workspaceBootstrapSnapshotCache, cacheKey)
-    if (cached) {
-        return cached
+    if (!input?.skipCache) {
+        const cached = getCacheEntryValue(workspaceBootstrapSnapshotCache, cacheKey)
+        if (cached) {
+            return cached
+        }
     }
 
     const emptyPayload: WorkspaceBootstrapSnapshot = {
@@ -573,31 +597,53 @@ export async function getWorkspaceBootstrapForCurrentUser(
     }
 
     const accessToken = input?.accessToken ?? await getAccessToken(supabase)
-    if (!accessToken) {
-        return emptyPayload
+    if (accessToken) {
+        const data = await apiRequest<WorkspaceBootstrapApiResponse | null>({
+            path: '/workspace/bootstrap',
+            method: 'GET',
+            accessToken,
+        })
+        if (data) {
+            const snapshot = buildSnapshotFromBootstrapResponse(data, user.id)
+            setCacheEntryValue(workspaceBootstrapSnapshotCache, cacheKey, snapshot)
+            return snapshot
+        }
     }
 
-    const data = await apiRequest<WorkspaceBootstrapApiResponse | null>({
-        path: '/workspace/bootstrap',
-        method: 'GET',
-        accessToken,
-    })
-
-    if (!data) {
-        setCacheEntryValue(workspaceBootstrapSnapshotCache, cacheKey, emptyPayload)
-        return emptyPayload
+    if (input?.proxyOptions?.cookieHeader && input.proxyOptions?.appOrigin) {
+        const proxyUrl = `${input.proxyOptions.appOrigin.replace(/\/+$/, '')}/api/workspace/bootstrap`
+        try {
+            const res = await fetch(proxyUrl, {
+                method: 'GET',
+                headers: { cookie: input.proxyOptions.cookieHeader },
+                cache: 'no-store',
+            })
+            if (res.ok) {
+                const data = (await res.json()) as WorkspaceBootstrapApiResponse
+                const snapshot = buildSnapshotFromBootstrapResponse(data, user.id)
+                setCacheEntryValue(workspaceBootstrapSnapshotCache, cacheKey, snapshot)
+                return snapshot
+            }
+        } catch {
+            // fall through to identity fallback
+        }
     }
 
-    const snapshot: WorkspaceBootstrapSnapshot = {
-        profile: mapProfile(data.profile, user.id),
-        membership: mapMembership(data.membership),
-        verification_status: normalizeOrganizationVerificationStatus(data.verification_status),
-        current_plan: mapBillingCurrentPlan(data.current_plan),
-        organization_core_team: mapArray(data.organization_core_team, mapOrganizationCoreTeamMember),
-        organization_readiness: mapOrganizationReadiness(data.organization_readiness),
-        startup_discovery_feed: mapArray(data.startup_discovery_feed, mapStartupDiscoveryFeedItem),
-        startup_readiness: mapStartupReadiness(data.startup_readiness),
+    const identitySnapshot = await getWorkspaceIdentityForUser(supabase, user, input?.accessToken ? { accessToken: input.accessToken } : undefined)
+    if (identitySnapshot.membership) {
+        const minimalSnapshot: WorkspaceBootstrapSnapshot = {
+            profile: identitySnapshot.profile,
+            membership: identitySnapshot.membership,
+            verification_status: 'unverified',
+            current_plan: null,
+            organization_core_team: [],
+            organization_readiness: null,
+            startup_discovery_feed: [],
+            startup_readiness: null,
+        }
+        setCacheEntryValue(workspaceBootstrapSnapshotCache, cacheKey, minimalSnapshot)
+        return minimalSnapshot
     }
-    setCacheEntryValue(workspaceBootstrapSnapshotCache, cacheKey, snapshot)
-    return snapshot
+
+    return emptyPayload
 }

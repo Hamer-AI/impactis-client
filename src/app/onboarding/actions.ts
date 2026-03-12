@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { getPostAuthRedirectPath } from '@/modules/auth'
+import { getOnboardingQuestionsPath } from '@/modules/onboarding'
 import {
     createOrganizationWithOwner,
     getPrimaryOrganizationMembershipByUserId,
@@ -52,7 +53,7 @@ export async function completeOnboardingAction(
 
     const existingMembership = await getPrimaryOrganizationMembershipByUserId(null as any, user.id)
     if (existingMembership) {
-        redirect(getPostAuthRedirectPath(true))
+        redirect(getPostAuthRedirectPath(true, { skipCache: true }))
     }
 
     const type = normalizeOrganizationType(formData.get('organizationType'))
@@ -80,5 +81,6 @@ export async function completeOnboardingAction(
         return { error: message }
     }
 
-    redirect(getPostAuthRedirectPath(true))
+    // After org creation, go to role-based onboarding questions (user can skip there).
+    redirect(getOnboardingQuestionsPath())
 }

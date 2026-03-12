@@ -2,6 +2,8 @@
 
 import { Plus, X } from 'lucide-react'
 import { useEffect, useMemo, useState, type KeyboardEvent } from 'react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
     normalizeTagValue,
     parseTagsFromText,
@@ -114,21 +116,22 @@ export function TagEditor(input: TagEditorProps) {
                     <span key={tag} className={`inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all hover:scale-105 ${chipClass}`}>
                         {tag}
                         {!input.disabled ? (
-                            <button
+                            <Button
                                 type="button"
+                                variant="ghost"
+                                size="icon"
                                 onClick={() => removeTag(tag)}
-                                className="group relative rounded-full p-0.5"
+                                className="h-6 w-6 rounded-full p-0 hover:bg-rose-500 hover:text-white"
                                 aria-label={`Remove ${tag}`}
                             >
-                                <div className="absolute inset-0 scale-50 rounded-full bg-rose-500 opacity-0 transition-all group-hover:scale-110 group-hover:opacity-100" />
-                                <X className="relative h-3 w-3 transition-all group-hover:text-white" />
-                            </button>
+                                <X className="h-3 w-3" />
+                            </Button>
                         ) : null}
                     </span>
                 ))}
 
                 {!input.disabled ? (
-                    <input
+                    <Input
                         id={input.id}
                         value={draft}
                         onChange={(event) => setDraft(normalizeTagValue(event.target.value))}
@@ -136,7 +139,7 @@ export function TagEditor(input: TagEditorProps) {
                         onBlur={handleDraftBlur}
                         disabled={input.disabled}
                         placeholder={tags.length === 0 ? input.placeholder : 'Add more...'}
-                        className={`min-w-[140px] flex-1 border-0 bg-transparent px-1 py-1 text-sm font-medium outline-none placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-60 ${textMainClass}`}
+                        className={`min-w-[140px] flex-1 border-0 bg-transparent shadow-none focus-visible:ring-0 placeholder:text-slate-400 ${textMainClass}`}
                     />
                 ) : tags.length === 0 ? (
                     <span className={`text-sm italic opacity-40 ${textMainClass}`}>No categories set</span>
@@ -148,21 +151,23 @@ export function TagEditor(input: TagEditorProps) {
             ) : null}
 
             {availableSuggestions.length > 0 && !input.disabled ? (
-                <div className="mt-4 flex flex-wrap gap-2">
+                    <div className="mt-4 flex flex-wrap gap-2">
                     {availableSuggestions.slice(0, input.suggestionLimit ?? 10).map((tag) => (
-                        <button
+                        <Button
                             key={tag}
                             type="button"
+                            variant="outline"
+                            size="sm"
                             onClick={() => addTag(tag)}
                             disabled={input.disabled}
-                            className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-all hover:scale-105 active:scale-95 disabled:opacity-50 ${input.isLight
-                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                                : 'border-emerald-500/30 bg-emerald-500/5 text-emerald-400 hover:bg-emerald-500/10'
-                                }`}
+                            className={input.isLight
+                                ? 'rounded-full border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                : 'rounded-full border-emerald-500/30 bg-emerald-500/5 text-emerald-400 hover:bg-emerald-500/10'
+                            }
                         >
                             <Plus className="h-3 w-3" />
                             {tag}
-                        </button>
+                        </Button>
                     ))}
                 </div>
             ) : null}

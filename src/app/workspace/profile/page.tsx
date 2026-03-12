@@ -5,7 +5,6 @@ import {
     Building2,
     LayoutDashboard,
     MapPin,
-    Settings2,
     UserRound,
 } from 'lucide-react'
 import type { ComponentType } from 'react'
@@ -16,10 +15,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Separator } from '@/components/ui/separator'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { getOnboardingPath } from '@/modules/onboarding'
+import { getOnboardingQuestionsPath } from '@/modules/onboarding'
 import { getWorkspaceIdentityForUser } from '@/modules/workspace'
-import WorkspaceThemeToggle from '../WorkspaceThemeToggle'
-import WorkspaceUserMenu from '../WorkspaceUserMenu'
+import { WorkspaceIdentityHydration } from '@/components/workspace-identity-hydration'
 import ProfileForm from './ProfileForm'
+import OnboardingDataEditor from './OnboardingDataEditor'
 
 function getValue(value: string | null): string {
     return value && value.trim().length > 0 ? value : 'Not set yet'
@@ -141,6 +141,19 @@ export default async function WorkspaceProfilePage() {
         redirect(getOnboardingPath())
     }
 
+    const metadata = (session.user as any)?.user_metadata as Record<string, unknown> | undefined
+    const role = (typeof metadata?.role === 'string' ? metadata.role : (membership.organization.type ?? 'startup')) as string
+    const onboardingData = (metadata?.onboardingData && typeof metadata.onboardingData === 'object' && metadata.onboardingData !== null)
+        ? (metadata.onboardingData as Record<string, any>)
+        : {}
+    const roleData = onboardingData[role] && typeof onboardingData[role] === 'object' ? onboardingData[role] : null
+    const onboardingScore =
+        typeof roleData?.score === 'number'
+            ? Math.max(0, Math.min(100, Math.round(roleData.score)))
+            : 0
+    const onboardingDone = metadata?.onboardingCompleted === true
+    const onboardingSkipped = metadata?.onboardingSkipped === true
+
     const cookieStore = await cookies()
     const themeCookie = cookieStore.get('workspace_theme')?.value
     const isLight = themeCookie === 'light'
@@ -202,14 +215,11 @@ export default async function WorkspaceProfilePage() {
         ? 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900 border-transparent'
         : 'text-slate-300 hover:bg-slate-800 hover:text-slate-100 border-transparent'
 
-    return (
-        <main data-workspace-root="true" className={`relative min-h-screen overflow-hidden ${pageShellClass}`}>
-            {/* Ambient Background Elements */}
-            <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-                <div className={`absolute -left-32 -top-32 h-[420px] w-[420px] rounded-full ${isLight ? 'bg-emerald-500/5' : 'bg-emerald-500/10'} blur-[120px] ws-float`} />
-                <div className={`absolute right-[-10%] top-[40%] h-[340px] w-[340px] rounded-full ${isLight ? 'bg-blue-400/5' : 'bg-emerald-400/5'} blur-[100px] ws-float-delayed-1`} />
-            </div>
+    const initialIdentity = { profile, membership }
 
+    return (
+        <WorkspaceIdentityHydration initialData={initialIdentity}>
+        <div className="flex-1 overflow-y-auto">
             <div className="relative mx-auto max-w-[1400px] px-6 py-8 md:py-12">
                 <div className="flex flex-col gap-10">
                     {/* Immersive Profile Hero */}
@@ -261,14 +271,6 @@ export default async function WorkspaceProfilePage() {
                         </div>
 
                         {/* Theme & Meta Controls */}
-                        <div className="absolute top-6 right-6 flex items-center gap-3">
-                            <WorkspaceThemeToggle />
-                            <Link href="/workspace">
-                                <Button variant="ghost" size="icon" className="rounded-xl hover:bg-emerald-500/10 hover:text-emerald-500 transition-colors">
-                                    <Settings2 className="h-5 w-5" />
-                                </Button>
-                            </Link>
-                        </div>
                     </header>
 
                     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -292,6 +294,40 @@ export default async function WorkspaceProfilePage() {
 
                         {/* Complete your profile - right column */}
                         <aside className="space-y-6">
+                            <OnboardingDataEditor role={role} initialValues={roleData} />
+                            <div className={`rounded-[2rem] border p-6 ${panelClass} backdrop-blur-xl`}>
+                                <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                        <h3 className={`text-sm font-bold ${textMainClass}`}>Onboarding</h3>
+                                        <p className={`mt-1 text-xs font-semibold ${textMutedClass}`}>
+                                            Role questions completion score.
+                                        </p>
+                                    </div>
+                                    <span className={`rounded-full px-3 py-1 text-xs font-black ${isLight ? 'bg-slate-100 text-slate-700' : 'bg-slate-800 text-slate-200'}`}>
+                                        {onboardingScore}/100
+                                    </span>
+                                </div>
+                                <div className="mt-4">
+                                    {!onboardingDone ? (
+                                        <div className={`rounded-2xl border px-4 py-3 text-sm font-semibold ${isLight ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-amber-500/30 bg-amber-500/10 text-amber-200'}`}>
+                                            {onboardingSkipped
+                                                ? 'You skipped onboarding. Finish anytime to improve your score.'
+                                                : 'Finish onboarding to improve your score.'}
+                                        </div>
+                                    ) : (
+                                        <div className={`rounded-2xl border px-4 py-3 text-sm font-semibold ${isLight ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200'}`}>
+                                            Onboarding completed.
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="mt-4">
+                                    <Button asChild variant="outline" className="w-full">
+                                        <Link href={getOnboardingQuestionsPath()}>
+                                            {onboardingDone ? 'View onboarding' : 'Continue onboarding'}
+                                        </Link>
+                                    </Button>
+                                </div>
+                            </div>
                             <div className={`flex flex-col gap-6 rounded-[2rem] border p-6 ${panelClass} backdrop-blur-xl sticky top-8`}>
                                 <h3 className={`text-sm font-bold ${textMainClass}`}>Complete your profile</h3>
                                 <div className="relative flex h-24 w-24 shrink-0 items-center justify-center mx-auto">
@@ -344,6 +380,7 @@ export default async function WorkspaceProfilePage() {
                     </div>
                 </div>
             </div>
-        </main>
+        </div>
+        </WorkspaceIdentityHydration>
     )
 }

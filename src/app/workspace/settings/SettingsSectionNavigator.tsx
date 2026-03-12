@@ -35,6 +35,7 @@ export type SettingsSectionItem = {
 type SettingsSectionNavigatorProps = {
     sections: SettingsSectionItem[]
     isLight: boolean
+    collapsed?: boolean
 }
 
 const ICON_MAP: Record<string, typeof Building2> = {
@@ -84,9 +85,10 @@ function getIconColors(icon: SettingsSectionIcon) {
 export default function SettingsSectionNavigator({
     sections,
     isLight,
+    collapsed = false,
 }: SettingsSectionNavigatorProps) {
     return (
-        <div className="space-y-1.5">
+        <div className={collapsed ? 'flex flex-col items-center gap-1.5 w-full' : 'space-y-1.5'}>
             {sections.map((section) => {
                 const Icon = getSectionIcon(section.icon)
                 const iconColors = getIconColors(section.icon)
@@ -97,9 +99,10 @@ export default function SettingsSectionNavigator({
                     <Link
                         key={section.id}
                         href={section.href}
-                        className="block group"
+                        className="block group w-full"
+                        title={collapsed ? section.label : undefined}
                     >
-                        <div className={`relative flex w-full items-center gap-3.5 rounded-2xl px-3.5 py-3 transition-all duration-300 ${isActive
+                        <div className={`relative flex w-full items-center gap-3.5 rounded-2xl px-3.5 py-3 transition-all duration-300 ${collapsed ? 'justify-center w-11 min-w-11 px-0 py-0 h-11' : ''} ${isActive
                                 ? isLight
                                     ? 'bg-gradient-to-r from-emerald-50 to-white border border-emerald-200/80 shadow-sm shadow-emerald-500/5'
                                     : 'bg-gradient-to-r from-emerald-500/[0.08] to-transparent border border-emerald-500/20 shadow-lg shadow-emerald-900/10'
@@ -108,7 +111,7 @@ export default function SettingsSectionNavigator({
                                     : 'border border-transparent hover:bg-white/[0.02] hover:border-white/[0.04]'
                             }`}>
                             {/* Active indicator bar */}
-                            {isActive && (
+                            {isActive && !collapsed && (
                                 <div className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-[3px] rounded-r-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
                             )}
 
@@ -123,26 +126,28 @@ export default function SettingsSectionNavigator({
                                     }`} />
                             </div>
 
-                            {/* Text */}
-                            <div className="min-w-0 flex-1">
-                                <p className={`text-[12px] font-bold tracking-tight transition-colors ${isActive
-                                        ? isLight ? 'text-emerald-700' : 'text-emerald-300'
-                                        : isLight ? 'text-slate-700 group-hover:text-slate-900' : 'text-slate-300 group-hover:text-slate-100'
-                                    }`}>
-                                    {section.label}
-                                </p>
-                                {description && (
-                                    <p className={`mt-0.5 text-[10px] font-medium transition-colors truncate ${isActive
-                                            ? isLight ? 'text-emerald-600/60' : 'text-emerald-400/50'
-                                            : isLight ? 'text-slate-400' : 'text-slate-600'
+                            {/* Text - hidden when collapsed */}
+                            {!collapsed && (
+                                <div className="min-w-0 flex-1">
+                                    <p className={`text-[12px] font-bold tracking-tight transition-colors ${isActive
+                                            ? isLight ? 'text-emerald-700' : 'text-emerald-300'
+                                            : isLight ? 'text-slate-700 group-hover:text-slate-900' : 'text-slate-300 group-hover:text-slate-100'
                                         }`}>
-                                        {description}
+                                        {section.label}
                                     </p>
-                                )}
-                            </div>
+                                    {description && (
+                                        <p className={`mt-0.5 text-[10px] font-medium transition-colors truncate ${isActive
+                                                ? isLight ? 'text-emerald-600/60' : 'text-emerald-400/50'
+                                                : isLight ? 'text-slate-400' : 'text-slate-600'
+                                            }`}>
+                                            {description}
+                                        </p>
+                                    )}
+                                </div>
+                            )}
 
-                            {/* Chevron */}
-                            {isActive && (
+                            {/* Chevron - hidden when collapsed */}
+                            {isActive && !collapsed && (
                                 <ChevronRight className={`h-3.5 w-3.5 shrink-0 ${isLight ? 'text-emerald-400' : 'text-emerald-500/60'}`} />
                             )}
                         </div>

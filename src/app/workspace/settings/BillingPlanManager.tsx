@@ -225,11 +225,12 @@ export default function BillingPlanManager({
                             const isCurrent = currentPlan?.plan.code === plan.plan_code
 
                             return (
-                                <button
+                                <Button
                                     key={plan.plan_code}
                                     type="button"
+                                    variant="outline"
                                     onClick={() => setSelectedPlanCode(plan.plan_code)}
-                                    className={`group rounded-2xl border p-4 text-left transition-all ${
+                                    className={`group h-auto rounded-2xl border p-4 text-left transition-all ${
                                         isSelected
                                             ? isLight
                                                 ? 'border-emerald-400 bg-emerald-50 shadow-sm'
@@ -276,7 +277,7 @@ export default function BillingPlanManager({
                                             </p>
                                         ))}
                                     </div>
-                                </button>
+                                </Button>
                             )
                         })}
                     </div>
@@ -294,13 +295,15 @@ export default function BillingPlanManager({
                                 const label = interval === 'annual' ? 'Annual' : 'Monthly'
 
                                 return (
-                                    <button
+                                    <Button
                                         key={interval}
                                         type="button"
+                                        variant="ghost"
+                                        size="sm"
                                         onClick={() => setSelectedIntervalOverride(interval)}
-                                        className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                                        className={`gap-1 rounded-full px-3 py-1 text-xs font-semibold ${
                                             isSelectedInterval
-                                                ? 'bg-emerald-500 text-white'
+                                                ? 'bg-emerald-500 text-white hover:bg-emerald-500 hover:text-white'
                                                 : isLight
                                                     ? 'text-slate-600 hover:text-slate-900'
                                                     : 'text-slate-300 hover:text-slate-50'
@@ -308,7 +311,7 @@ export default function BillingPlanManager({
                                     >
                                         <CircleDollarSign className="h-3 w-3" />
                                         {label}
-                                    </button>
+                                    </Button>
                                 )
                             })}
                         </div>

@@ -406,6 +406,7 @@ function mapStartupDiscoveryFeedItem(value: unknown): StartupDiscoveryFeedItem |
         return null
     }
 
+    const needAdvisor = row.need_advisor === true
     return {
         id,
         startup_org_id: startupOrgId,
@@ -419,6 +420,7 @@ function mapStartupDiscoveryFeedItem(value: unknown): StartupDiscoveryFeedItem |
         startup_verification_status: normalizeStartupDiscoveryVerificationStatus(
             row.startup_verification_status
         ),
+        need_advisor: needAdvisor,
     }
 }
 
@@ -475,6 +477,7 @@ function mapStartupPost(value: unknown): StartupPost | null {
         return null
     }
 
+    const needAdvisor = row.need_advisor === true
     return {
         id,
         startup_org_id: startupOrgId,
@@ -483,6 +486,7 @@ function mapStartupPost(value: unknown): StartupPost | null {
         stage: normalizeText(row.stage),
         location: normalizeText(row.location),
         industry_tags: normalizeArray(row.industry_tags),
+        need_advisor: needAdvisor,
         status,
         published_at: normalizeText(row.published_at),
         updated_at: updatedAt,

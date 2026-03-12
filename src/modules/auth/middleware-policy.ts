@@ -2,9 +2,10 @@ type User = {
     id: string
     email?: string | null
     last_sign_in_at?: string | null
+    user_metadata?: Record<string, unknown>
 }
 import { isOnboardingPath } from '@/modules/onboarding'
-import { getPostAuthRedirectPath, isWorkspacePath, isAuthEntryPath, isPublicPath } from './routing'
+import { getDashboardPathForRole, getPostAuthRedirectPath, isWorkspacePath, isAuthEntryPath, isPublicPath } from './routing'
 
 type MiddlewareContext = {
     pathname: string
@@ -32,6 +33,7 @@ export function decideMiddlewareNavigation({
     if (!user) {
         return { type: 'allow' }
     }
+    const metadata = (user as any)?.user_metadata as Record<string, unknown> | undefined
 
     if (!hasOrganizationMembership) {
         if (isOnboardingPath(pathname)) {
@@ -45,12 +47,13 @@ export function decideMiddlewareNavigation({
         return { type: 'allow' }
     }
 
-    if (isOnboardingPath(pathname)) {
-        return { type: 'redirect', destination: getPostAuthRedirectPath(true) }
-    }
+    // User has membership. Allow access to workspace and onboarding;
+    // high-level onboarding routing is handled in app routes/layouts.
 
+    // Allow logged-in users to open login/signup (e.g. to switch account or create another).
+    // Otherwise they would always be redirected to workspace and never see auth pages.
     if (isAuthEntryPath(pathname)) {
-        return { type: 'redirect', destination: getPostAuthRedirectPath(true) }
+        return { type: 'allow' }
     }
 
     return { type: 'allow' }

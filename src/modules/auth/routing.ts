@@ -42,11 +42,14 @@ export function sanitizeNextPath(nextPathParam: string | null | undefined): stri
     return nextPathParam
 }
 
-export function getPostAuthRedirectPath(hasOrganizationMembership: boolean): string {
-    return hasOrganizationMembership ? WORKSPACE_PATH : ONBOARDING_PATH
+export function getPostAuthRedirectPath(hasOrganizationMembership: boolean, options?: { skipCache?: boolean }): string {
+    if (!hasOrganizationMembership) return ONBOARDING_PATH
+    return options?.skipCache ? `${WORKSPACE_PATH}?refresh=1` : WORKSPACE_PATH
 }
 
 export function getDashboardPathForRole(_role: unknown): string {
     void _role
-    return WORKSPACE_PATH
+    // After onboarding metadata updates, we want server components to re-fetch session
+    // and not rely on any cached membership/metadata reads.
+    return `${WORKSPACE_PATH}?refresh=1`
 }

@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { LogOut, Settings, UserRound } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -79,13 +80,14 @@ export default function WorkspaceUserMenu({
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <form action="/auth/signout" method="post" className="p-1">
-                    <button
+                    <Button
                         type="submit"
-                        className="inline-flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-rose-700 transition-colors hover:bg-rose-50"
+                        variant="ghost"
+                        className="w-full justify-start gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-rose-700 hover:bg-rose-50"
                     >
                         <LogOut className="h-4 w-4" />
                         Sign out
-                    </button>
+                    </Button>
                 </form>
             </DropdownMenuContent>
         </DropdownMenu>
