@@ -53,6 +53,9 @@ function CheckboxGroup(input: {
     )
 }
 
+const inputClass = 'min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold text-slate-900 outline-none focus:border-[#0B3D2E] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100'
+const labelClass = 'text-base font-bold'
+
 function SelectField(input: {
     label: string
     name: keyof InvestorOnboardingValues
@@ -66,10 +69,10 @@ function SelectField(input: {
             name={input.name as any}
             render={({ field }) => (
                 <FormItem>
-                    <FormLabel>{input.label}</FormLabel>
+                    <FormLabel className={labelClass}>{input.label}</FormLabel>
                     <FormControl>
                         <select
-                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-[#0B3D2E] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                            className={inputClass}
                             value={(field.value as any) ?? ''}
                             onChange={(e) => field.onChange(e.target.value)}
                         >

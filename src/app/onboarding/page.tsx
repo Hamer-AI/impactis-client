@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
+import { Pool } from 'pg'
 import { auth } from '@/lib/auth'
 import { getPostAuthRedirectPath } from '@/modules/auth'
 import {
@@ -9,6 +10,66 @@ import {
     type OrganizationType,
 } from '@/modules/organizations'
 import OnboardingForm from './OnboardingForm'
+import OnboardingGoToDashboard from './OnboardingGoToDashboard'
+
+function getPool(): Pool {
+    const databaseUrl = process.env.DATABASE_URL
+    if (!databaseUrl) throw new Error('DATABASE_URL is not configured')
+    const pool = new Pool({ connectionString: databaseUrl })
+    pool.on('connect', (client) => {
+        client.query('SET search_path TO public')
+    })
+    return pool
+}
+
+async function getOnboardingCompletedFromDb(userId: string): Promise<{ completed: boolean; hasCompanyName: boolean; companyName: string | null }> {
+    let pool: Pool | null = null
+    try {
+        pool = getPool()
+        const progressRows = await pool.query<{ is_completed: boolean }>(
+            `select is_completed from public.user_onboarding_progress where user_id = $1::uuid limit 1`,
+            [userId]
+        )
+        if (progressRows.rows[0]?.is_completed === true) {
+            const detailsRows = await pool.query<{ details: unknown }>(
+                `select details from public.user_onboarding_details where user_id = $1::uuid limit 3`,
+                [userId]
+            )
+            for (const row of detailsRows.rows) {
+                if (row?.details && typeof row.details === 'object' && !Array.isArray(row.details)) {
+                    const name = (row.details as Record<string, unknown>).companyName
+                    if (typeof name === 'string' && name.trim().length >= 2) {
+                        return { completed: true, hasCompanyName: true, companyName: name.trim() }
+                    }
+                }
+            }
+            return { completed: true, hasCompanyName: false, companyName: null }
+        }
+        const detailsRows = await pool.query<{ details: unknown }>(
+            `select details from public.user_onboarding_details where user_id = $1::uuid limit 3`,
+            [userId]
+        )
+        for (const row of detailsRows.rows) {
+            if (row?.details && typeof row.details === 'object' && !Array.isArray(row.details)) {
+                const name = (row.details as Record<string, unknown>).companyName
+                if (typeof name === 'string' && name.trim().length >= 2) {
+                    return { completed: false, hasCompanyName: true, companyName: name.trim() }
+                }
+            }
+        }
+    } catch {
+        /* ignore */
+    } finally {
+        if (pool) {
+            try {
+                await pool.end()
+            } catch {
+                /* ignore */
+            }
+        }
+    }
+    return { completed: false, hasCompanyName: false, companyName: null }
+}
 
 function resolveDefaultOrganizationType(value: unknown): OrganizationType {
     return mapAppRoleToOrganizationType(value) ?? 'startup'
@@ -54,6 +115,23 @@ export default async function OnboardingPage() {
     }
 
     const metadata = user.user_metadata as Record<string, unknown> | undefined
+    const role = (typeof metadata?.role === 'string' ? metadata.role : metadata?.intended_org_type) ?? 'startup'
+    const onboardingData = metadata?.onboardingData && typeof metadata.onboardingData === 'object' ? (metadata.onboardingData as Record<string, unknown>) : {}
+    const roleData = onboardingData[role] && typeof onboardingData[role] === 'object' ? (onboardingData[role] as Record<string, unknown>) : {}
+    const fromMetadata = metadata?.onboardingCompleted === true || (typeof roleData.companyName === 'string' && roleData.companyName.trim().length >= 2)
+
+    const fromDb = await getOnboardingCompletedFromDb(user.id)
+    const showGoToDashboard = fromMetadata || fromDb.completed || fromDb.hasCompanyName
+
+    if (showGoToDashboard) {
+        const dbCompanyName = fromDb.companyName ?? null
+        return (
+            <main className="min-h-screen bg-gray-50 px-4 py-20 flex items-center justify-center">
+                <OnboardingGoToDashboard companyNameFromDb={dbCompanyName} />
+            </main>
+        )
+    }
+
     const metadataOrgType = metadata?.intended_org_type
     const metadataRole = metadata?.role
     const metadataCompany = metadata?.company
@@ -85,21 +163,24 @@ export default async function OnboardingPage() {
                     defaultIndustryTags={Array.from(new Set(defaultIndustryTags))}
                 />
 
-                <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-                    <Link
-                        href="/"
-                        className="inline-flex items-center justify-center rounded-xl border border-gray-200 px-5 py-3 font-semibold text-gray-700 hover:bg-gray-50"
-                    >
-                        Back To Home
-                    </Link>
-                    <form action="/auth/signout" method="post" className="w-full sm:w-auto">
-                        <button
-                            type="submit"
-                            className="inline-flex w-full items-center justify-center rounded-xl bg-[#0B3D2E] px-5 py-3 font-semibold text-white hover:bg-[#082a20]"
+                <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-col gap-3 sm:flex-row">
+                        <Link
+                            href="/"
+                            className="inline-flex items-center justify-center rounded-xl border border-gray-200 px-5 py-3 font-semibold text-gray-700 hover:bg-gray-50"
                         >
-                            Sign Out
-                        </button>
-                    </form>
+                            Back To Home
+                        </Link>
+                        <form action="/auth/signout" method="post" className="w-full sm:w-auto">
+                            <button
+                                type="submit"
+                                className="inline-flex w-full items-center justify-center rounded-xl bg-[#0B3D2E] px-5 py-3 font-semibold text-white hover:bg-[#082a20]"
+                            >
+                                Sign Out
+                            </button>
+                        </form>
+                    </div>
+                    <OnboardingGoToDashboard inline />
                 </div>
             </section>
         </main>

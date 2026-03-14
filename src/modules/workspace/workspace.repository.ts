@@ -22,6 +22,7 @@ import type {
 } from '@/modules/startups'
 import { mapBillingCurrentPlan } from '@/modules/billing'
 import type {
+    UnifiedDiscoveryCard,
     WorkspaceDashboardSnapshot,
     WorkspaceOrganizationReadinessSnapshot,
     WorkspaceSettingsSnapshot,
@@ -96,6 +97,7 @@ type WorkspaceDashboardSnapshotRow = {
     organization_core_team: unknown
     organization_readiness: unknown
     startup_discovery_feed: unknown
+    discovery_feed: unknown
     startup_readiness: unknown
 }
 
@@ -421,6 +423,28 @@ function mapStartupDiscoveryFeedItem(value: unknown): StartupDiscoveryFeedItem |
             row.startup_verification_status
         ),
         need_advisor: needAdvisor,
+        logo_url: normalizeText(row.logo_url),
+    }
+}
+
+function mapUnifiedDiscoveryCard(value: unknown): UnifiedDiscoveryCard | null {
+    if (!value || typeof value !== 'object') return null
+    const row = value as Record<string, unknown>
+    const org_id = normalizeText(row.org_id)
+    const org_type = row.org_type === 'startup' || row.org_type === 'investor' || row.org_type === 'advisor' ? row.org_type : null
+    const name = normalizeText(row.name)
+    const description = normalizeText(row.description) ?? ''
+    if (!org_id || !org_type || !name) return null
+    return {
+        org_id,
+        org_type,
+        name,
+        description,
+        industry_or_expertise: normalizeArray(row.industry_or_expertise),
+        stage: normalizeText(row.stage),
+        location: normalizeText(row.location),
+        image_url: normalizeText(row.image_url),
+        id: normalizeText(row.id) ?? undefined,
     }
 }
 
@@ -593,6 +617,7 @@ export async function getWorkspaceDashboardForCurrentUser(
         organization_core_team: mapArray(row.organization_core_team, mapOrganizationCoreTeamMember),
         organization_readiness: mapOrganizationReadiness(row.organization_readiness),
         startup_discovery_feed: mapArray(row.startup_discovery_feed, mapStartupDiscoveryFeedItem),
+        discovery_feed: mapArray(row.discovery_feed, mapUnifiedDiscoveryCard),
         startup_readiness: mapStartupReadiness(row.startup_readiness),
     }
 }

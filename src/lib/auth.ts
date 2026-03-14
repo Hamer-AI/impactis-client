@@ -10,7 +10,7 @@ const pool = new Pool({
 });
 
 pool.on("connect", (client) => {
-  client.query("SET search_path TO auth, public");
+  client.query("SET search_path TO public");
 });
 
 export const auth = betterAuth({
@@ -48,6 +48,9 @@ export const auth = betterAuth({
   },
   session: {
     modelName: "sessions",
+    // Default is 7 days. Uncomment to customize:
+    // expiresIn: 60 * 60 * 24 * 7,   // 7 days (in seconds)
+    // updateAge: 60 * 60 * 24,        // refresh expiry every 1 day when active
   },
   account: {
     modelName: "accounts",

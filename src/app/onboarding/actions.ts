@@ -84,3 +84,53 @@ export async function completeOnboardingAction(
     // After org creation, go to role-based onboarding questions (user can skip there).
     redirect(getOnboardingQuestionsPath())
 }
+
+/** Creates a default organization for users who completed the 6-step onboarding but never created an org, then redirects to dashboard. */
+export async function createDefaultOrganizationAndRedirect(companyNameFromDb?: string | null): Promise<{ error: string | null }> {
+    const session = await auth.api.getSession({
+        headers: await headers(),
+    })
+    const user = session?.user as any
+
+    if (!user) {
+        return { error: 'Your session has expired. Please log in again.' }
+    }
+
+    const existingMembership = await getPrimaryOrganizationMembershipByUserId(null as any, user.id)
+    if (existingMembership) {
+        redirect(getPostAuthRedirectPath(true, { skipCache: true }))
+        return { error: null }
+    }
+
+    const meta = (user.user_metadata ?? {}) as Record<string, unknown>
+    const role = (typeof meta.role === 'string' ? meta.role : meta.intended_org_type) ?? 'startup'
+    const type = normalizeOrganizationType(role) ?? 'startup'
+    const onboardingData = meta.onboardingData && typeof meta.onboardingData === 'object' ? (meta.onboardingData as Record<string, unknown>) : {}
+    const roleData = onboardingData[role] && typeof onboardingData[role] === 'object' ? (onboardingData[role] as Record<string, unknown>) : {}
+    const nameFromMeta = typeof roleData.companyName === 'string' && roleData.companyName.trim().length >= 2
+        ? roleData.companyName.trim()
+        : null
+    const companyName = nameFromMeta ?? (typeof companyNameFromDb === 'string' && companyNameFromDb.trim().length >= 2 ? companyNameFromDb.trim() : null) ?? 'My Organization'
+    const location = typeof roleData.countryOfIncorporation === 'string' && roleData.countryOfIncorporation.trim()
+        ? roleData.countryOfIncorporation.trim()
+        : null
+
+    try {
+        await createOrganizationWithOwner(null as any, {
+            type,
+            name: companyName,
+            location,
+            industryTags: [],
+        })
+    } catch (error) {
+        const raw = error instanceof Error ? error.message : 'Unable to create organization right now.'
+        const message =
+            /failed to fetch|network error|load failed/i.test(raw)
+                ? 'Cannot reach the server. Make sure the backend is running (e.g. npm run start:dev in impactis-server) and try again.'
+                : raw
+        return { error: message }
+    }
+
+    redirect(getPostAuthRedirectPath(true, { skipCache: true }))
+    return { error: null }
+}

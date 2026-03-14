@@ -17,8 +17,16 @@ const THEME_STORAGE_KEY = 'workspace-theme'
 
 function applyWorkspaceTheme(theme: WorkspaceTheme) {
     if (typeof document === 'undefined') return
-    document.documentElement.classList.toggle('dark', theme === 'dark')
-    document.documentElement.classList.toggle(WORKSPACE_LIGHT_CLASS, theme === 'light')
+    const root = document.documentElement
+    if (theme === 'dark') {
+        root.classList.add('dark')
+        root.classList.remove(WORKSPACE_LIGHT_CLASS)
+        root.style.colorScheme = 'dark'
+    } else {
+        root.classList.remove('dark')
+        root.classList.add(WORKSPACE_LIGHT_CLASS)
+        root.style.colorScheme = 'light'
+    }
 }
 
 function persistWorkspaceTheme(theme: WorkspaceTheme) {
@@ -49,7 +57,8 @@ function getStoredTheme(): WorkspaceTheme {
         }
         if (document.documentElement.classList.contains(WORKSPACE_LIGHT_CLASS)) return 'light'
     }
-    return 'dark'
+    // Default to light when nothing stored (match root layout script default)
+    return 'light'
 }
 
 export type WorkspaceThemeContextValue = {

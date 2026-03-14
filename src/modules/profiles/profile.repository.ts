@@ -22,6 +22,7 @@ type ProfileRow = {
     linkedin_url: string | null
     timezone_name: string | null
     preferred_contact_method: string | null
+    profile_completeness_percent?: number | null
 }
 
 function normalizeText(value: unknown): string | null {
@@ -46,6 +47,12 @@ function normalizePreferredContactMethod(value: unknown): PreferredContactMethod
     return null
 }
 
+function normalizeProfileCompletenessPercent(value: unknown): number | null {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return null
+    const n = Math.round(value)
+    return n >= 0 && n <= 100 ? n : null
+}
+
 function mapRowToUserProfile(row: ProfileRow): UserProfile {
     return {
         id: row.id,
@@ -59,6 +66,7 @@ function mapRowToUserProfile(row: ProfileRow): UserProfile {
         linkedin_url: normalizeText(row.linkedin_url),
         timezone_name: normalizeText(row.timezone_name),
         preferred_contact_method: normalizePreferredContactMethod(row.preferred_contact_method),
+        profile_completeness_percent: normalizeProfileCompletenessPercent(row.profile_completeness_percent),
     }
 }
 
@@ -75,6 +83,7 @@ function getEmptyProfileFallback(userId: string): UserProfile {
         linkedin_url: null,
         timezone_name: null,
         preferred_contact_method: null,
+        profile_completeness_percent: null,
     }
 }
 

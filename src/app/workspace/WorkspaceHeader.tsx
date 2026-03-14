@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { Bell, Share2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -8,6 +9,7 @@ import WorkspaceThemeToggle from './WorkspaceThemeToggle'
 import WorkspaceUserMenu from './WorkspaceUserMenu'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
+import { getNotificationsUnreadCount } from '@/modules/notifications/notifications.repository'
 
 type WorkspaceHeaderProps = {
     workspaceLabel: string
@@ -24,6 +26,9 @@ const PATH_TITLES: Record<string, string> = {
     '/workspace/settings': 'Organization',
     '/workspace/preferences': 'Settings',
     '/workspace/help': 'Help & Support',
+    '/workspace/notifications': 'Notifications',
+    '/workspace/discovery': 'Discovery',
+    '/workspace/connections': 'Deal Room',
 }
 
 function getPageTitle(pathname: string): string {
@@ -43,6 +48,11 @@ export default function WorkspaceHeader({
     const pageTitle = getPageTitle(pathname ?? '/workspace')
     const { isLight } = useWorkspaceTheme(initialIsLight)
     const textMainClass = isLight ? 'text-slate-900' : 'text-slate-100'
+    const [unreadCount, setUnreadCount] = useState<number>(0)
+
+    useEffect(() => {
+        getNotificationsUnreadCount().then(setUnreadCount)
+    }, [pathname])
 
     return (
         <header
@@ -53,7 +63,7 @@ export default function WorkspaceHeader({
             )}
         >
             <nav className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3 text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">
-                <Link href="/workspace" className="truncate opacity-40 hover:opacity-70 transition-opacity">
+                <Link href="/" className="truncate opacity-40 hover:opacity-70 transition-opacity" title="Back to home">
                     {workspaceLabel}
                 </Link>
                 <span className="shrink-0 opacity-20">/</span>
@@ -65,14 +75,20 @@ export default function WorkspaceHeader({
             <div className="flex shrink-0 items-center gap-3 sm:gap-4 md:gap-6">
                 <div className="hidden sm:flex items-center gap-3">
                     <Button
-                        type="button"
+                        asChild
                         variant="outline"
                         size="icon"
                         className={`relative h-9 w-9 rounded-full ${isLight ? 'border-slate-200 bg-white text-slate-400 hover:text-emerald-500 hover:bg-slate-50' : 'border-white/5 bg-slate-900/40 text-slate-400 hover:text-emerald-500 hover:bg-slate-800/60'}`}
-                        aria-label="Notifications"
+                        aria-label={unreadCount > 0 ? `${unreadCount} unread notifications` : 'Notifications'}
                     >
-                        <Bell className="h-4 w-4" />
-                        <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full border-2 border-white bg-emerald-500 dark:border-slate-900" />
+                        <Link href="/workspace/notifications">
+                            <Bell className="h-4 w-4" />
+                            {unreadCount > 0 ? (
+                                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full border-2 border-white bg-rose-500 px-1 text-[10px] font-bold text-white dark:border-slate-900">
+                                    {unreadCount > 99 ? '99+' : unreadCount}
+                                </span>
+                            ) : null}
+                        </Link>
                     </Button>
                     <WorkspaceThemeToggle />
                 </div>

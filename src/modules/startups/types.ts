@@ -105,6 +105,7 @@ export type StartupDiscoveryFeedItem = {
     published_at: string | null
     startup_verification_status: StartupDiscoveryVerificationStatus
     need_advisor: boolean
+    logo_url: string | null
 }
 
 export type StartupPublicDiscoveryProfile = {

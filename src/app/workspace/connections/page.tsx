@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
+import { toast } from 'sonner'
 import { Loader2, MessageCircle, Send, UserCheck, UserX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -40,11 +41,31 @@ export default function WorkspaceConnectionsPage() {
     }, [refresh])
 
     const handleAccept = useCallback((id: string) => {
-        acceptConnectionRequest(id).then(() => refresh())
+        acceptConnectionRequest(id)
+            .then((result) => {
+                if (result && !('error' in result)) {
+                    toast.success('Connection accepted', {
+                        description: 'You can now message from Deal Room.',
+                    })
+                }
+                refresh()
+            })
+            .catch(() => {
+                toast.error('Failed to accept')
+                refresh()
+            })
     }, [refresh])
 
     const handleReject = useCallback((id: string) => {
-        rejectConnectionRequest(id).then(() => refresh())
+        rejectConnectionRequest(id)
+            .then(() => {
+                toast.success('Request declined')
+                refresh()
+            })
+            .catch(() => {
+                toast.error('Failed to decline')
+                refresh()
+            })
     }, [refresh])
 
     const panelClass = isLight

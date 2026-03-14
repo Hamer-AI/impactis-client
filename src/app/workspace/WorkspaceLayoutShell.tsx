@@ -22,6 +22,7 @@ import {
     Bell,
     Palette,
     MessageCircle,
+    Compass,
 } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
@@ -44,33 +45,23 @@ type WorkspaceNavItem = {
     href: string
     label: string
     icon: ComponentType<{ className?: string }>
+    children?: WorkspaceNavItem[]
+    isActive?: (pathname: string, searchParams: URLSearchParams) => boolean
+    /** When set, this item is a dropdown parent; click toggles expand/collapse instead of navigating. */
+    expandKey?: string
 }
 
 type OrgType = 'startup' | 'investor' | 'advisor'
 
 const SETTINGS_SECTIONS_STARTUP: Omit<SettingsSectionItem, 'href' | 'active'>[] = [
     { id: 'settings-identity', label: 'Organization Identity', icon: 'identity' },
-    { id: 'settings-billing', label: 'Subscription & Billing', icon: 'billing' },
-    { id: 'settings-startup-readiness', label: 'Startup Profile', icon: 'readiness' },
-    { id: 'settings-discovery', label: 'Discovery Post', icon: 'discovery' },
-    { id: 'settings-data-room', label: 'Investor Data Room', icon: 'dataroom' },
-    { id: 'settings-invites', label: 'Team Invites', icon: 'invites' },
-    { id: 'settings-permissions', label: 'Permission Rules', icon: 'permissions' },
-    { id: 'settings-readiness-rules', label: 'Readiness Qualification Rules', icon: 'rules' },
 ]
 const SETTINGS_SECTIONS_OTHER: Omit<SettingsSectionItem, 'href' | 'active'>[] = [
     { id: 'settings-identity', label: 'Organization Identity', icon: 'identity' },
-    { id: 'settings-billing', label: 'Subscription & Billing', icon: 'billing' },
-    { id: 'settings-invites', label: 'Team Invites', icon: 'invites' },
-    { id: 'settings-permissions', label: 'Permission Rules', icon: 'permissions' },
     { id: 'settings-team-access', label: 'Team Access', icon: 'team' },
 ]
 
-const PREFERENCES_SECTIONS = [
-    { id: 'security', label: 'Security', icon: ShieldCheck },
-    { id: 'notifications', label: 'Notifications', icon: Bell },
-    { id: 'appearance', label: 'Appearance', icon: Palette },
-] as const
+const PREFERENCES_SECTIONS = [{ id: 'security', label: 'Security', icon: ShieldCheck }] as const
 
 type SidebarNavLinkProps = {
     href: string
@@ -80,6 +71,7 @@ type SidebarNavLinkProps = {
     collapsed?: boolean
     activeClassName: string
     idleClassName: string
+    className?: string
 }
 
 function SidebarNavLink({
@@ -90,6 +82,7 @@ function SidebarNavLink({
     collapsed,
     activeClassName,
     idleClassName,
+    className,
 }: SidebarNavLinkProps) {
     const router = useRouter()
 
@@ -105,7 +98,8 @@ function SidebarNavLink({
                 'h-11 rounded-xl text-[11px] font-black uppercase tracking-[0.2em] transition-all duration-300',
                 'inline-flex items-center gap-3 px-3',
                 active ? activeClassName : idleClassName,
-                collapsed ? 'w-11 min-w-11 justify-center px-0' : 'w-full justify-start'
+                collapsed ? 'w-11 min-w-11 justify-center px-0' : 'w-full justify-start',
+                className
             )}
             title={collapsed ? label : undefined}
         >
@@ -152,27 +146,54 @@ export default function WorkspaceLayoutShell({
     const pathname = usePathname() ?? ''
     const searchParams = useSearchParams()
     const [mobileOpen, setMobileOpen] = useState(false)
+    const [expandedNavKeys, setExpandedNavKeys] = useState<Set<string>>(() => new Set())
     const { sidebarCollapsed: isCollapsed, setSidebarCollapsed } = useWorkspaceUI()
     const { isLight } = useWorkspaceTheme(initialIsLight)
 
-    const pageShellClass = isLight ? 'bg-slate-50 text-slate-900' : 'bg-[#070b14] text-slate-100'
-    const panelClass = isLight ? 'border-slate-200 bg-white shadow-sm ring-1 ring-slate-200/40' : 'border-white/5 bg-slate-900/80'
+    const pageShellClass = isLight ? 'bg-white text-slate-900' : 'bg-[#070b14] text-slate-100'
+    const panelClass = isLight ? 'border-slate-200 bg-white shadow-sm ring-1 ring-slate-200/40' : 'border-white/10 bg-slate-900/60'
     const textMainClass = isLight ? 'text-slate-900' : 'text-slate-100'
     const textMutedClass = isLight ? 'text-slate-500' : 'text-slate-400'
     const navActiveClass = isLight ? 'border-emerald-200 bg-emerald-50 text-emerald-700 shadow-sm' : 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300 shadow-sm shadow-emerald-950/20'
-    const navIdleClass = isLight ? 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900' : 'text-slate-300 hover:bg-slate-800 hover:text-slate-100'
+    const navIdleClass = isLight ? 'text-slate-600 hover:bg-emerald-50 hover:text-emerald-800' : 'text-slate-300 hover:bg-slate-800 hover:text-slate-100'
 
     const orgType = (membership as { organization?: { type?: string } } | null)?.organization?.type as OrgType | undefined
     const isSettingsRoute = pathname.startsWith('/workspace/settings')
     const isPreferencesRoute = pathname.startsWith('/workspace/preferences')
-    const isSubRoute = isSettingsRoute || isPreferencesRoute
+    const isSubRoute = isSettingsRoute
 
     const navItems: WorkspaceNavItem[] = useMemo(
         () => [
             { href: '/workspace', label: 'Overview', icon: LayoutDashboard },
             { href: '/workspace/profile', label: 'Profile', icon: UserRound },
-            { href: '/workspace/settings', label: 'Organization', icon: Building2 },
-            { href: '/workspace/connections', label: 'Connections', icon: MessageCircle },
+            {
+                href: '/workspace/organization',
+                label: 'Organization',
+                icon: Building2,
+                expandKey: 'organization',
+                isActive: (p) => p.startsWith('/workspace/organization'),
+                children: [{ href: '/workspace/organization', label: 'Organization Identity', icon: Building2 }],
+            },
+            { href: '/workspace/subscription', label: 'Subscription & Billing', icon: Settings2 },
+            { href: '/workspace/data-room', label: 'Data Room', icon: Settings2 },
+            { href: '/workspace/discovery', label: 'Discovery', icon: Compass },
+            { href: '/workspace/connections', label: 'Deal Room', icon: MessageCircle },
+            { href: '/workspace/notifications', label: 'Notifications', icon: Bell },
+            { href: '/workspace/deal-room/syndicate', label: 'Syndicate', icon: MessageCircle },
+            {
+                href: '/workspace/preferences?section=security',
+                label: 'Security',
+                icon: ShieldCheck,
+                expandKey: 'security',
+                isActive: (p, sp) =>
+                    p.startsWith('/workspace/preferences')
+                    && (sp.get('section') === 'security' || sp.get('section') === 'notifications' || sp.get('section') === 'appearance'),
+                children: [
+                    { href: '/workspace/preferences?section=security', label: 'Detail Security', icon: ShieldCheck },
+                    { href: '/workspace/preferences?section=notifications', label: 'Notification', icon: Bell },
+                    { href: '/workspace/preferences?section=appearance', label: 'Appearance', icon: Palette },
+                ],
+            },
             { href: '/workspace/preferences', label: 'Settings', icon: Settings2 },
             { href: '/workspace/help', label: 'Help & Support', icon: LifeBuoy },
         ],
@@ -183,7 +204,9 @@ export default function WorkspaceLayoutShell({
         if (!isSettingsRoute || !orgType) return []
         const blueprint = orgType === 'startup' ? SETTINGS_SECTIONS_STARTUP : SETTINGS_SECTIONS_OTHER
         const sectionParam = searchParams.get('section')
-        const allowedIds = new Set(blueprint.map((s) => s.id))
+        // We hide some sections from the Organization sidebar, but still allow
+        // deep-linking to them (e.g. Subscription & Billing is accessible from main nav).
+        const allowedIds = new Set([...blueprint.map((s) => s.id), 'settings-billing'])
         const activeId = sectionParam && allowedIds.has(sectionParam) ? sectionParam : blueprint[0]?.id ?? 'settings-identity'
         return blueprint.map((s) => ({
             ...s,
@@ -192,9 +215,32 @@ export default function WorkspaceLayoutShell({
         }))
     }, [isSettingsRoute, orgType, searchParams])
 
-    const preferencesActiveId = isPreferencesRoute
-        ? (searchParams.get('section') === 'notifications' ? 'notifications' : searchParams.get('section') === 'appearance' ? 'appearance' : 'security')
-        : null
+    const isChildActive = (child: WorkspaceNavItem) => {
+        if (child.href.includes('?')) {
+            const [path, qs] = child.href.split('?')
+            const params = new URLSearchParams(qs)
+            return pathname === path && params.get('section') === searchParams.get('section')
+        }
+        return pathname.startsWith(child.href)
+    }
+    const effectiveExpanded = useMemo(() => {
+        const next = new Set(expandedNavKeys)
+        navItems.forEach((item) => {
+            if (item.expandKey && item.children?.length) {
+                const anyChildActive = item.children.some((c) => isChildActive(c))
+                if (anyChildActive) next.add(item.expandKey)
+            }
+        })
+        return next
+    }, [expandedNavKeys, pathname, searchParams, navItems])
+    const toggleExpanded = (key: string) => {
+        setExpandedNavKeys((prev) => {
+            const next = new Set(prev)
+            if (next.has(key)) next.delete(key)
+            else next.add(key)
+            return next
+        })
+    }
 
     useEffect(() => {
         const routes = ['/workspace', '/workspace/profile', '/workspace/settings', '/workspace/preferences', '/workspace/help']
@@ -227,12 +273,15 @@ export default function WorkspaceLayoutShell({
                                         <SheetTitle className={cn(isLight ? 'text-slate-900' : 'text-slate-100')}>Impactis</SheetTitle>
                                     </SheetHeader>
                                     <div className="space-y-2">
-                                        {navItems.map((item) => (
+                                        {navItems.flatMap((item) => [item, ...(item.children ?? [])]).map((item) => (
                                             <Button
                                                 key={item.href}
                                                 asChild
                                                 variant="ghost"
-                                                className={cn('w-full justify-start gap-3 rounded-xl', navIdleClass)}
+                                                className={cn(
+                                                    'w-full justify-start gap-3 rounded-xl',
+                                                    navIdleClass,
+                                                )}
                                                 onClick={() => setMobileOpen(false)}
                                             >
                                                 <Link href={item.href}>
@@ -254,7 +303,7 @@ export default function WorkspaceLayoutShell({
                                 </div>
                             </SheetContent>
                         </Sheet>
-                        <span className="text-sm font-black tracking-tight text-emerald-500">Impactis</span>
+                        <Link href="/" className="text-sm font-black tracking-tight text-emerald-500 hover:opacity-90">Impactis</Link>
                     </div>
                 </div>
             </div>
@@ -268,7 +317,7 @@ export default function WorkspaceLayoutShell({
                             <div className={cn('flex flex-col gap-4', isCollapsed ? 'items-center' : '')}>
                                 <Link
                                     href="/workspace"
-                                    className={cn('inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest transition-colors', isLight ? 'text-slate-500 hover:bg-slate-100 hover:text-slate-700' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200', isCollapsed && 'justify-center p-2')}
+                                    className={cn('inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest transition-colors', isLight ? 'text-slate-500 hover:bg-emerald-50 hover:text-emerald-800' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200', isCollapsed && 'justify-center p-2')}
                                     title="Back to Workspace"
                                 >
                                     <ArrowLeft className="h-3 w-3 shrink-0" />
@@ -295,15 +344,17 @@ export default function WorkspaceLayoutShell({
                             </div>
                         ) : (
                             <div className="flex items-center justify-between gap-3">
-                                <p
+                                <Link
+                                    href="/"
                                     className={cn(
-                                        'truncate text-xl font-black tracking-[-0.02em] text-emerald-500 transition-all duration-200',
+                                        'truncate text-xl font-black tracking-[-0.02em] text-emerald-500 transition-all duration-200 hover:opacity-90',
                                         isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'
                                     )}
                                     aria-hidden={isCollapsed}
+                                    title="Back to home"
                                 >
                                     Impactis
-                                </p>
+                                </Link>
                                 <Button
                                     type="button"
                                     variant="ghost"
@@ -361,55 +412,88 @@ export default function WorkspaceLayoutShell({
                                     <SettingsSectionNavigator sections={settingsSections} isLight={isLight} collapsed={isCollapsed} />
                                 </div>
                             </div>
-                        ) : isPreferencesRoute ? (
-                            <div className={cn('space-y-1.5', isCollapsed ? 'flex flex-col items-center w-full' : '')}>
-                                {!isCollapsed && (
-                                    <p className={cn('mb-4 px-3 text-[9px] font-black uppercase tracking-[0.25em]', textMutedClass, 'opacity-60')}>
-                                        Preferences
-                                    </p>
-                                )}
-                                {PREFERENCES_SECTIONS.map((section) => {
-                                    const active = section.id === preferencesActiveId
-                                    const Icon = section.icon
-                                    return (
-                                        <Button
-                                            key={section.id}
-                                            asChild
-                                            variant="ghost"
-                                            className={cn(
-                                                'rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] transition-all duration-300',
-                                                'inline-flex items-center gap-3 px-3',
-                                                active ? navActiveClass : navIdleClass,
-                                                isCollapsed ? 'h-11 w-11 min-w-11 justify-center px-0' : 'w-full justify-start px-4 py-3'
-                                            )}
-                                            title={isCollapsed ? section.label : undefined}
-                                        >
-                                            <Link href={`/workspace/preferences?section=${section.id}`} className="inline-flex h-full w-full items-center gap-3">
-                                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg">
-                                                    <Icon className={cn('h-4 w-4', active ? 'text-emerald-500' : '')} />
-                                                </span>
-                                                <span className={cn('truncate text-left transition-all duration-200', isCollapsed ? 'w-0 overflow-hidden opacity-0' : 'min-w-0 flex-1')} aria-hidden={isCollapsed}>
-                                                    {section.label}
-                                                </span>
-                                            </Link>
-                                        </Button>
-                                    )
-                                })}
-                            </div>
                         ) : (
                             <div className={cn('flex flex-col gap-1', isCollapsed ? 'items-center w-full' : '')}>
-                                {navItems.map((item) => (
-                                    <SidebarNavLink
-                                        key={item.href}
-                                        href={item.href}
-                                        label={item.label}
-                                        icon={item.icon}
-                                        active={item.href === '/workspace' ? (pathname === '/workspace' || pathname === '/workspace/') : pathname.startsWith(item.href)}
-                                        collapsed={isCollapsed}
-                                        activeClassName={navActiveClass}
-                                        idleClassName={navIdleClass}
-                                    />
-                                ))}
+                                {navItems.map((item) => {
+                                    const active = item.isActive
+                                        ? item.isActive(pathname, searchParams)
+                                        : item.href === '/workspace'
+                                            ? pathname === '/workspace' || pathname === '/workspace/'
+                                            : pathname.startsWith(item.href)
+                                    const isDropdown = Boolean(item.expandKey && item.children?.length)
+                                    const isExpanded = item.expandKey ? effectiveExpanded.has(item.expandKey) : false
+                                    return (
+                                        <div key={item.href} className={cn('flex flex-col', isCollapsed ? 'items-center' : '')}>
+                                            {isDropdown ? (
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    onClick={() => toggleExpanded(item.expandKey!)}
+                                                    className={cn(
+                                                        'h-11 rounded-xl text-[11px] font-black uppercase tracking-[0.2em] transition-all duration-300',
+                                                        'inline-flex items-center gap-3 px-3',
+                                                        active ? navActiveClass : navIdleClass,
+                                                        isCollapsed ? 'w-11 min-w-11 justify-center px-0' : 'w-full justify-start'
+                                                    )}
+                                                    title={isCollapsed ? item.label : undefined}
+                                                >
+                                                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg">
+                                                        <item.icon className={cn('h-4 w-4', active ? 'text-emerald-500' : '')} />
+                                                    </span>
+                                                    <span
+                                                        className={cn(
+                                                            'truncate text-left transition-all duration-200',
+                                                            isCollapsed ? 'w-0 overflow-hidden opacity-0' : 'min-w-0 flex-1'
+                                                        )}
+                                                        aria-hidden={isCollapsed}
+                                                    >
+                                                        {item.label}
+                                                    </span>
+                                                    {!isCollapsed && (
+                                                        <span
+                                                            className={cn(
+                                                                'ml-auto transition-transform duration-200',
+                                                                isExpanded ? 'rotate-180' : ''
+                                                            )}
+                                                            aria-hidden
+                                                        >
+                                                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                                                            </svg>
+                                                        </span>
+                                                    )}
+                                                </Button>
+                                            ) : (
+                                                <SidebarNavLink
+                                                    href={item.href}
+                                                    label={item.label}
+                                                    icon={item.icon}
+                                                    active={active}
+                                                    collapsed={isCollapsed}
+                                                    activeClassName={navActiveClass}
+                                                    idleClassName={navIdleClass}
+                                                />
+                                            )}
+                                            {!isCollapsed && item.children && item.children.length > 0 && isExpanded ? (
+                                                <div className="mt-1 space-y-1 pl-8">
+                                                    {item.children.map((child) => (
+                                                        <SidebarNavLink
+                                                            key={child.href}
+                                                            href={child.href}
+                                                            label={child.label}
+                                                            icon={child.icon}
+                                                            active={isChildActive(child)}
+                                                            collapsed={false}
+                                                            activeClassName={navActiveClass}
+                                                            idleClassName={navIdleClass}
+                                                            className="h-10 rounded-xl text-[10px] font-extrabold normal-case tracking-normal"
+                                                        />
+                                                    ))}
+                                                </div>
+                                            ) : null}
+                                        </div>
+                                    )
+                                })}
                             </div>
                         )}
                     </div>

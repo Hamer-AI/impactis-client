@@ -42,9 +42,11 @@ export function sanitizeNextPath(nextPathParam: string | null | undefined): stri
     return nextPathParam
 }
 
+const LANDING_PATH = '/'
+
 export function getPostAuthRedirectPath(hasOrganizationMembership: boolean, options?: { skipCache?: boolean }): string {
     if (!hasOrganizationMembership) return ONBOARDING_PATH
-    return options?.skipCache ? `${WORKSPACE_PATH}?refresh=1` : WORKSPACE_PATH
+    return LANDING_PATH
 }
 
 export function getDashboardPathForRole(_role: unknown): string {

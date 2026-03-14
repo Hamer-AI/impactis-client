@@ -48,7 +48,7 @@ export function buildSignupMetadata(formData: SignupFormPayload): SignupMetadata
     const role = isSignupRole(formData.role) ? formData.role : null
 
     // This metadata only seeds `public.profiles` at signup time via DB trigger.
-    // It is scrubbed from `auth.users.raw_user_meta_data` after sync.
+    // It is scrubbed from `public.users.raw_user_meta_data` after sync.
     return {
         full_name: formData.fullName,
         intended_org_type: getIntendedOrgType(role),

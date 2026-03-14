@@ -103,21 +103,11 @@ export default function StartupDiscoveryFeedPanel(input: StartupDiscoveryFeedPan
     const visibleFeed = filteredFeed.slice(0, visibleCount)
     const hasMore = visibleCount < filteredFeed.length
 
-    const searchFieldClass = input.isLight
-        ? 'border-slate-200/90 bg-white/90 shadow-[0_10px_30px_-20px_rgba(15,23,42,0.55)]'
-        : 'border-slate-700/70 bg-slate-900/65 shadow-[0_16px_32px_-24px_rgba(2,6,23,0.95)]'
-    const searchInputClass = input.isLight
-        ? 'text-slate-900 placeholder:text-slate-400'
-        : 'text-slate-100 placeholder:text-slate-500'
-    const searchIconClass = input.isLight
-        ? 'bg-emerald-50 text-emerald-600'
-        : 'bg-emerald-500/10 text-emerald-400'
-    const searchHintClass = input.isLight
-        ? 'border-slate-200 bg-slate-100 text-slate-500'
-        : 'border-slate-700 bg-slate-800 text-slate-400'
-    const clearButtonClass = input.isLight
-        ? 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'
-        : 'text-slate-500 hover:bg-slate-800 hover:text-slate-200'
+    const searchFieldClass = 'border-slate-200/90 bg-white dark:!bg-white dark:!border-slate-200 shadow-[0_10px_30px_-20px_rgba(15,23,42,0.55)]'
+    const searchInputClass = 'text-slate-900 dark:text-slate-900 placeholder:text-slate-400'
+    const searchIconClass = 'bg-emerald-50 text-emerald-600 dark:!bg-emerald-50 dark:!text-emerald-600'
+    const searchHintClass = 'border-slate-200 bg-slate-100 text-slate-500 dark:!border-slate-200 dark:!bg-slate-100 dark:!text-slate-500'
+    const clearButtonClass = 'text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:!text-slate-500 dark:hover:bg-slate-100 dark:hover:!text-slate-700'
 
     function resetAllFilters() {
         setQuery('')
@@ -269,11 +259,11 @@ export default function StartupDiscoveryFeedPanel(input: StartupDiscoveryFeedPan
                     </Button>
                 </div>
             ) : visibleFeed.length === 0 ? (
-                <div className="flex flex-col items-center justify-center rounded-[3rem] border border-dashed border-slate-200 p-20 dark:border-slate-800">
-                    <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-slate-50 dark:bg-slate-900">
-                        <Search className="h-8 w-8 text-slate-300" />
+                <div className="flex flex-col items-center justify-center rounded-[3rem] border border-dashed border-slate-200 p-20 dark:!border-slate-200">
+                    <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-slate-100 dark:!bg-slate-100">
+                        <Search className="h-8 w-8 text-slate-400 dark:!text-slate-500" />
                     </div>
-                    <p className="mt-6 text-base font-bold text-slate-500">No matching pipelines found</p>
+                    <p className="mt-6 text-base font-bold text-slate-500 dark:!text-slate-600">No matching pipelines found</p>
                     <Button type="button" variant="ghost" onClick={resetAllFilters} className="mt-2 text-xs font-black uppercase tracking-widest text-emerald-500">Reset Filters</Button>
                 </div>
             ) : null}

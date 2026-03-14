@@ -3,6 +3,7 @@
 import { apiRequest } from '@/lib/api/rest-client'
 import { getBetterAuthTokenClient } from '@/lib/better-auth-token-client'
 import type { StartupPublicDiscoveryProfile } from '@/modules/startups/types'
+import type { UnifiedDiscoveryCard } from '@/modules/workspace/types'
 
 /** Client-safe: fetch startup public discovery profile (for use in client components). */
 export async function getStartupPublicDiscoveryProfileClient(
@@ -65,5 +66,32 @@ function mapDoc(d: unknown): StartupPublicDiscoveryProfile['data_room_documents'
         file_url: typeof v?.file_url === 'string' ? v.file_url : null,
         file_name: typeof v?.file_name === 'string' ? v.file_name : null,
         summary: typeof v?.summary === 'string' ? v.summary : null,
+    }
+}
+
+/** Client-safe: fetch a single unified discovery card by org id (for investor/advisor detail view). */
+export async function getUnifiedDiscoveryCardClient(orgId: string): Promise<UnifiedDiscoveryCard | null> {
+    const accessToken = await getBetterAuthTokenClient()
+    if (!accessToken) return null
+    const path = `/workspace/discovery/card?orgId=${encodeURIComponent(orgId)}`
+    const row = await apiRequest<UnifiedDiscoveryCard | null>({
+        path,
+        method: 'GET',
+        accessToken,
+    })
+    if (!row || typeof row !== 'object') return null
+    const r = row as Record<string, unknown>
+    const org_type = r.org_type === 'startup' || r.org_type === 'investor' || r.org_type === 'advisor' ? r.org_type : null
+    if (!org_type || typeof r.org_id !== 'string' || typeof r.name !== 'string') return null
+    return {
+        org_id: String(r.org_id),
+        org_type,
+        name: String(r.name),
+        description: typeof r.description === 'string' ? r.description : '',
+        industry_or_expertise: Array.isArray(r.industry_or_expertise) ? r.industry_or_expertise.filter((x): x is string => typeof x === 'string') : [],
+        stage: typeof r.stage === 'string' ? r.stage : null,
+        location: typeof r.location === 'string' ? r.location : null,
+        image_url: typeof r.image_url === 'string' ? r.image_url : null,
+        id: typeof r.id === 'string' ? r.id : undefined,
     }
 }

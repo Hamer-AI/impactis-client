@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, ChangeEvent, useEffect, MouseEvent } from 'react'
+import { useWorkspaceTheme } from '@/app/workspace/WorkspaceThemeContext'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -29,7 +30,6 @@ type ProfileFormProps = {
     defaultLinkedinUrl: string
     defaultTimezoneName: string
     defaultPreferredContactMethod: string
-    isLight?: boolean
 }
 
 function toTitleCase(value: string): string {
@@ -49,8 +49,8 @@ export default function ProfileForm({
     defaultLinkedinUrl,
     defaultTimezoneName,
     defaultPreferredContactMethod,
-    isLight = true,
 }: ProfileFormProps) {
+    const { isLight } = useWorkspaceTheme()
     const queryClient = useQueryClient()
     const mutation = useMutation({
         mutationFn: (formData: FormData) => updateProfileAction(initialState, formData),
@@ -89,27 +89,13 @@ export default function ProfileForm({
         }
     }
 
-    const panelClass = isLight
-        ? 'border-slate-200 bg-white/90 shadow-sm'
-        : 'border-slate-800 bg-slate-900/60 shadow-2xl'
-    const textMainClass = isLight
-        ? 'text-slate-900'
-        : 'text-slate-100'
-    const inputClass = isLight
-        ? 'border-slate-200 bg-white text-slate-900 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10'
-        : 'border-slate-800 bg-slate-950 text-slate-100 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10'
-    const selectClass = isLight
-        ? 'border-slate-200 bg-white text-slate-900 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10'
-        : 'border-slate-800 bg-slate-950 text-slate-100 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10'
-    const labelClass = isLight
-        ? 'text-slate-500'
-        : 'text-slate-400'
-    const textMutedClass = isLight
-        ? 'text-slate-600'
-        : 'text-slate-400'
-    const sectionTitleClass = isLight
-        ? 'text-slate-900'
-        : 'text-slate-100'
+    // Standard Tailwind dark: — theme toggle (document.documentElement.classList 'dark') drives appearance
+    const textMainClass = 'text-slate-900 dark:text-slate-100'
+    const inputClass = 'focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10'
+    const selectClass = 'focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10'
+    const labelClass = 'text-slate-500 dark:text-slate-400'
+    const textMutedClass = 'text-slate-600 dark:text-slate-400'
+    const sectionTitleClass = 'text-slate-900 dark:text-slate-100'
 
     useEffect(() => {
         if (!notice.success) {
@@ -169,13 +155,13 @@ export default function ProfileForm({
             >
             <input type="hidden" name="avatarCurrentUrl" value={currentAvatarUrl} />
 
-            {/* Profile photo */}
-            <Card className={`${panelClass} overflow-hidden rounded-2xl`}>
+            {/* Profile photo — standard Card (shadcn) follows theme toggle */}
+            <Card className="overflow-hidden">
                 <CardContent className="p-6">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-                        <Avatar className={`h-24 w-24 shrink-0 border-2 ${isLight ? 'border-slate-100' : 'border-slate-800'}`}>
+                        <Avatar className="h-24 w-24 shrink-0 border-2 border-slate-200 dark:border-slate-800">
                             <AvatarImage src={previewUrl || currentAvatarUrl} alt="Profile" />
-                            <AvatarFallback className={isLight ? 'bg-slate-100 text-slate-500' : 'bg-slate-800 text-slate-400'}>
+                            <AvatarFallback className="bg-white border border-slate-200 text-slate-500 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400">
                                 {defaultFullName?.trim() ? defaultFullName.trim().split(/\s+/).slice(0, 2).map((s) => s[0]).join('').toUpperCase() || 'U' : 'U'}
                             </AvatarFallback>
                         </Avatar>
@@ -242,7 +228,7 @@ export default function ProfileForm({
             </Card>
 
             {/* Personal Info */}
-            <Card className={`${panelClass} overflow-hidden rounded-2xl`}>
+            <Card className="overflow-hidden">
                 <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                         <h2 className={`text-base font-semibold ${sectionTitleClass}`}>Personal Info</h2>
@@ -286,7 +272,7 @@ export default function ProfileForm({
             </Card>
 
             {/* Location */}
-            <Card className={`${panelClass} overflow-hidden rounded-2xl`}>
+            <Card className="overflow-hidden">
                 <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                         <h2 className={`text-base font-semibold ${sectionTitleClass}`}>Location</h2>
@@ -301,7 +287,7 @@ export default function ProfileForm({
                         <div className="mt-4 flex flex-wrap items-end gap-3">
                             <div className="flex-1 min-w-[200px] space-y-2">
                                 <Label htmlFor="location" className={labelClass}>Location</Label>
-                                <div className={`flex rounded-xl border ${isLight ? 'border-slate-200 bg-white' : 'border-slate-700 bg-slate-950'}`}>
+                                <div className="flex rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950">
                                     <span className={`flex items-center pl-3 ${textMutedClass}`}>
                                         <MapPin className="h-4 w-4" />
                                     </span>
@@ -334,7 +320,7 @@ export default function ProfileForm({
             </Card>
 
             {/* Contact & links */}
-            <Card className={`${panelClass} overflow-hidden rounded-2xl`}>
+            <Card className="overflow-hidden">
                 <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                         <h2 className={`text-base font-semibold ${sectionTitleClass}`}>Contact & links</h2>
@@ -370,7 +356,7 @@ export default function ProfileForm({
                                         name="preferredContactMethod"
                                         value={preferredContactMethod}
                                         onChange={(event) => setPreferredContactMethod(event.target.value)}
-                                        className={`flex h-10 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 ${selectClass}`}
+                                        className={`flex h-10 w-full rounded-xl border px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 ${selectClass}`}
                                     >
                                         <option value="">No preference</option>
                                         <option value="email">Email</option>
@@ -424,7 +410,7 @@ export default function ProfileForm({
             {!editingBio && <input type="hidden" name="bio" value={bio} />}
 
             {/* Bio */}
-            <Card className={`${panelClass} overflow-hidden rounded-2xl`}>
+            <Card className="overflow-hidden">
                 <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                         <h2 className={`text-base font-semibold ${sectionTitleClass}`}>Bio</h2>

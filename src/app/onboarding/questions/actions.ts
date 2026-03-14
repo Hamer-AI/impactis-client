@@ -27,7 +27,7 @@ function getPool(): Pool {
     }
     const pool = new Pool({ connectionString: databaseUrl })
     pool.on('connect', (client) => {
-        client.query('SET search_path TO auth, public')
+        client.query('SET search_path TO public')
     })
     return pool
 }
@@ -99,7 +99,7 @@ export async function saveOnboardingQuestionnaireAction(
     const pool = getPool()
     try {
         await pool.query(
-            `update auth.users set raw_user_meta_data = $1::jsonb, updated_at = timezone('utc', now()) where id = $2::uuid`,
+            `update public.users set raw_user_meta_data = $1::jsonb, updated_at = timezone('utc', now()) where id = $2::uuid`,
             [JSON.stringify(nextMeta), user.id]
         )
     } catch (error) {

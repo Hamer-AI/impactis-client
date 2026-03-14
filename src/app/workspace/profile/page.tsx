@@ -135,7 +135,7 @@ export default async function WorkspaceProfilePage() {
     }
 
     const user = session.user
-    const { profile, membership } = await getWorkspaceIdentityForUser(null as any, user as any)
+    const { profile, membership, onboarding_progress, onboarding_details } = await getWorkspaceIdentityForUser(null as any, user as any)
 
     if (!membership) {
         redirect(getOnboardingPath())
@@ -143,10 +143,11 @@ export default async function WorkspaceProfilePage() {
 
     const metadata = (session.user as any)?.user_metadata as Record<string, unknown> | undefined
     const role = (typeof metadata?.role === 'string' ? metadata.role : (membership.organization.type ?? 'startup')) as string
-    const onboardingData = (metadata?.onboardingData && typeof metadata.onboardingData === 'object' && metadata.onboardingData !== null)
+    const metadataOnboardingData = (metadata?.onboardingData && typeof metadata.onboardingData === 'object' && metadata.onboardingData !== null)
         ? (metadata.onboardingData as Record<string, any>)
         : {}
-    const roleData = onboardingData[role] && typeof onboardingData[role] === 'object' ? onboardingData[role] : null
+    const roleDataFromTable = onboarding_details?.[role] && typeof onboarding_details[role] === 'object' ? onboarding_details[role] : null
+    const roleData = roleDataFromTable ?? (metadataOnboardingData[role] && typeof metadataOnboardingData[role] === 'object' ? metadataOnboardingData[role] : null)
     const onboardingScore =
         typeof roleData?.score === 'number'
             ? Math.max(0, Math.min(100, Math.round(roleData.score)))
@@ -156,7 +157,8 @@ export default async function WorkspaceProfilePage() {
 
     const cookieStore = await cookies()
     const themeCookie = cookieStore.get('workspace_theme')?.value
-    const isLight = themeCookie === 'light'
+    // Default to light when no cookie (match root layout script default)
+    const isLight = themeCookie !== 'dark'
 
     const firstName = profile.full_name?.trim().split(/\s+/)[0] ?? 'there'
     const completeness = getProfileCompleteness({
@@ -178,6 +180,13 @@ export default async function WorkspaceProfilePage() {
     const timezoneDone = !!(profile.timezone_name && profile.timezone_name.trim().length > 0)
     const preferredContactDone = !!profile.preferred_contact_method
     const biographyDone = !!(profile.bio && profile.bio.trim().length >= 20)
+    const onboardingComplete =
+        onboarding_progress != null &&
+        (onboarding_progress.is_completed || onboarding_progress.completed_stages >= onboarding_progress.total_stages)
+    const onboardingStagesLabel =
+        onboarding_progress != null
+            ? `${onboarding_progress.completed_stages} of ${onboarding_progress.total_stages}`
+            : '—'
 
     const completionSteps = [
         setupAccountDone,
@@ -189,31 +198,20 @@ export default async function WorkspaceProfilePage() {
         timezoneDone,
         preferredContactDone,
         biographyDone,
+        onboardingComplete,
     ]
     const completedSteps = completionSteps.filter(Boolean).length
-    const profileCompletePercent = Math.round((completedSteps / completionSteps.length) * 100)
+    const stepsTotal = completionSteps.length || 1
+    const profileCompletePercent = Math.round((completedSteps / stepsTotal) * 100)
 
-    const pageShellClass = isLight
-        ? 'bg-slate-50 text-slate-900'
-        : 'bg-[#070b14] text-slate-100'
-    const heroGradientClass = isLight
-        ? 'bg-[radial-gradient(circle_at_10%_8%,rgba(16,185,129,0.08),transparent_36%),radial-gradient(circle_at_86%_0%,rgba(37,99,235,0.08),transparent_36%)]'
-        : 'bg-[radial-gradient(circle_at_10%_8%,rgba(16,185,129,0.24),transparent_36%),radial-gradient(circle_at_86%_0%,rgba(59,130,246,0.24),transparent_36%)]'
-    const panelClass = isLight
-        ? 'border-slate-200 bg-white shadow-sm ring-1 ring-slate-200/40'
-        : 'border-slate-800 bg-slate-900/70'
-    const mutedPanelClass = isLight
-        ? 'border-slate-200 bg-slate-50/90'
-        : 'border-slate-800 bg-slate-950/70'
-    const textMainClass = isLight ? 'text-slate-900' : 'text-slate-100'
-    const textMutedClass = isLight ? 'text-slate-500' : 'text-slate-400'
-    const titleMutedClass = isLight ? 'text-slate-500' : 'text-slate-400'
-    const navActiveClass = isLight
-        ? 'border-emerald-200 bg-emerald-50 text-emerald-700 shadow-sm'
-        : 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300'
-    const navIdleClass = isLight
-        ? 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900 border-transparent'
-        : 'text-slate-300 hover:bg-slate-800 hover:text-slate-100 border-transparent'
+    // Standard Tailwind dark: — theme toggle drives appearance (no forced light/dark)
+    const panelClass = 'border-slate-200 bg-white shadow-sm ring-1 ring-slate-200/40 dark:border-slate-800 dark:bg-slate-900/70'
+    const mutedPanelClass = 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950/70'
+    const textMainClass = 'text-slate-900 dark:text-slate-100'
+    const textMutedClass = 'text-slate-500 dark:text-slate-400'
+    const titleMutedClass = 'text-slate-500 dark:text-slate-400'
+    const navActiveClass = 'border-emerald-200 bg-emerald-50 text-emerald-700 shadow-sm dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-300'
+    const navIdleClass = 'text-slate-600 hover:bg-emerald-50 hover:text-emerald-800 border-transparent dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100'
 
     const initialIdentity = { profile, membership }
 
@@ -229,9 +227,9 @@ export default async function WorkspaceProfilePage() {
                                 {/* Large Avatar Workspace */}
                                 <div className="relative group">
                                     <div className="absolute -inset-1 rounded-full bg-gradient-to-tr from-emerald-500 to-blue-500 opacity-20 blur-sm transition-all group-hover:opacity-40" />
-                                    <Avatar className={`relative h-32 w-32 border-4 ${isLight ? 'border-white shadow-xl' : 'border-slate-900 shadow-2xl'}`}>
+                                    <Avatar className="relative h-32 w-32 border-4 border-white shadow-xl dark:border-slate-900 dark:shadow-2xl">
                                         <AvatarImage src={profile.avatar_url ?? undefined} alt="Profile avatar" />
-                                        <AvatarFallback className={`text-3xl font-black ${isLight ? 'bg-slate-100 text-slate-400' : 'bg-slate-800 text-slate-500'}`}>
+                                        <AvatarFallback className="text-3xl font-black bg-white border border-slate-200 text-slate-500 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400">
                                             {getInitials(profile.full_name)}
                                         </AvatarFallback>
                                     </Avatar>
@@ -300,30 +298,34 @@ export default async function WorkspaceProfilePage() {
                                     <div>
                                         <h3 className={`text-sm font-bold ${textMainClass}`}>Onboarding</h3>
                                         <p className={`mt-1 text-xs font-semibold ${textMutedClass}`}>
-                                            Role questions completion score.
+                                            {onboarding_progress != null
+                                                ? `Stages completed: ${onboardingStagesLabel}${onboardingComplete ? ' (all done)' : ''}`
+                                                : 'Role onboarding stages — saved in your account.'}
                                         </p>
                                     </div>
-                                    <span className={`rounded-full px-3 py-1 text-xs font-black ${isLight ? 'bg-slate-100 text-slate-700' : 'bg-slate-800 text-slate-200'}`}>
-                                        {onboardingScore}/100
+                                    <span className={`rounded-full px-3 py-1 text-xs font-black ${onboardingComplete ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' : 'bg-white border border-slate-200 text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200'}`}>
+                                        {onboarding_progress != null ? `${onboarding_progress.completed_stages}/${onboarding_progress.total_stages}` : onboardingScore + '/100'}
                                     </span>
                                 </div>
                                 <div className="mt-4">
-                                    {!onboardingDone ? (
-                                        <div className={`rounded-2xl border px-4 py-3 text-sm font-semibold ${isLight ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-amber-500/30 bg-amber-500/10 text-amber-200'}`}>
-                                            {onboardingSkipped
-                                                ? 'You skipped onboarding. Finish anytime to improve your score.'
-                                                : 'Finish onboarding to improve your score.'}
+                                    {!onboardingComplete ? (
+                                        <div className="rounded-2xl border px-4 py-3 text-sm font-semibold border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                                            {onboarding_progress != null
+                                                ? `Complete all ${onboarding_progress.total_stages} stages to reach 100% profile completion.`
+                                                : onboardingSkipped
+                                                    ? 'You skipped onboarding. Finish anytime to improve your score.'
+                                                    : 'Finish onboarding to improve your score.'}
                                         </div>
                                     ) : (
-                                        <div className={`rounded-2xl border px-4 py-3 text-sm font-semibold ${isLight ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200'}`}>
-                                            Onboarding completed.
+                                        <div className="rounded-2xl border px-4 py-3 text-sm font-semibold border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
+                                            {onboarding_progress != null ? `${onboarding_progress.total_stages} of ${onboarding_progress.total_stages} stages completed.` : 'Onboarding completed.'}
                                         </div>
                                     )}
                                 </div>
                                 <div className="mt-4">
                                     <Button asChild variant="outline" className="w-full">
-                                        <Link href={getOnboardingQuestionsPath()}>
-                                            {onboardingDone ? 'View onboarding' : 'Continue onboarding'}
+                                        <Link href={onboardingComplete ? `${getOnboardingQuestionsPath()}?view=1` : getOnboardingQuestionsPath()}>
+                                            {onboardingComplete ? 'View onboarding' : 'Continue onboarding'}
                                         </Link>
                                     </Button>
                                 </div>
@@ -332,7 +334,7 @@ export default async function WorkspaceProfilePage() {
                                 <h3 className={`text-sm font-bold ${textMainClass}`}>Complete your profile</h3>
                                 <div className="relative flex h-24 w-24 shrink-0 items-center justify-center mx-auto">
                                     <svg className="h-full w-full -rotate-90 transform" viewBox="0 0 100 100">
-                                        <circle cx="50" cy="50" r="42" stroke="currentColor" strokeWidth="8" fill="transparent" className={isLight ? 'text-slate-200' : 'text-slate-700'} />
+                                        <circle cx="50" cy="50" r="42" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-slate-200 dark:text-slate-700" />
                                         <circle cx="50" cy="50" r="42" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray={2 * Math.PI * 42} strokeDashoffset={2 * Math.PI * 42 - (profileCompletePercent / 100) * (2 * Math.PI * 42)} strokeLinecap="round" className="text-emerald-500 transition-all duration-500 ease-out" />
                                     </svg>
                                     <span className={`absolute text-lg font-bold ${textMainClass}`}>{profileCompletePercent}%</span>
@@ -373,6 +375,10 @@ export default async function WorkspaceProfilePage() {
                                     <li className={`flex items-center gap-2 ${biographyDone ? 'text-emerald-600' : textMutedClass}`}>
                                         <span>{biographyDone ? '✓' : '✗'}</span>
                                         <span>Bio</span>
+                                    </li>
+                                    <li className={`flex items-center gap-2 ${onboardingComplete ? 'text-emerald-600' : textMutedClass}`}>
+                                        <span>{onboardingComplete ? '✓' : '✗'}</span>
+                                        <span>{onboarding_progress != null ? `Onboarding (${onboardingStagesLabel})` : 'Onboarding'}</span>
                                     </li>
                                 </ul>
                             </div>

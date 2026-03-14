@@ -1,3 +1,5 @@
+import { headers } from 'next/headers'
+import { auth } from '@/lib/auth'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import Hero from '@/components/sections/Hero'
@@ -9,10 +11,11 @@ import PricingSection from '@/components/sections/PricingSection'
 import FAQSection from '@/components/sections/FAQSection'
 import CTASection from '@/components/sections/CTASection'
 
-export default function Home() {
+export default async function Home() {
+  const session = await auth.api.getSession({ headers: await headers() })
   return (
     <main className="min-h-screen bg-white">
-      <Navbar />
+      <Navbar user={session?.user ?? null} />
       <Hero />
       <Features />
       <HowItWorks />

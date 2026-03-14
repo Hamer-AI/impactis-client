@@ -139,7 +139,7 @@ export default async function PreferencesPage({
 
     const cookieStore = await cookies()
     const themeCookie = cookieStore.get('workspace_theme')?.value
-    const isLight = themeCookie === 'light'
+    const isLight = themeCookie !== 'dark'
 
     const textMainClass = isLight ? 'text-slate-900' : 'text-slate-100'
     const textMutedClass = isLight ? 'text-slate-500' : 'text-slate-400'

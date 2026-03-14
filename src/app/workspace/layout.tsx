@@ -34,27 +34,31 @@ export default async function WorkspaceLayout({
 
     const cookieStore = await cookies()
     const themeCookie = cookieStore.get('workspace_theme')?.value
-    const isLight = themeCookie === 'light'
+    // Default to light when no cookie (match root layout script default)
+    const isLight = themeCookie !== 'dark'
 
-    const workspaceLabel = `${toTitleCase(membership.organization.type)} workspace`
+    const org = membership?.organization
+    const workspaceLabel = org ? `${toTitleCase(org.type)} workspace` : 'Workspace'
+    const displayName = profile?.full_name?.trim() || org?.name || 'User'
+    const organizationType = org?.type ?? 'startup'
 
     return (
         <WorkspaceThemeProvider initialIsLight={isLight}>
             <WorkspaceLayoutShell
                 initialIsLight={isLight}
                 membership={membership}
-                profile={profile}
+                profile={profile ?? { id: user.id, full_name: null, location: null, bio: null, avatar_url: null, phone: null, headline: null, website_url: null, linkedin_url: null, timezone_name: null, preferred_contact_method: null, profile_completeness_percent: null }}
                 organizationCoreTeam={[]}
                 verificationMeta={null}
                 workspaceLabel={workspaceLabel}
                 header={
                     <WorkspaceHeader
                         workspaceLabel={workspaceLabel}
-                        displayName={profile.full_name?.trim() || membership.organization.name}
+                        displayName={displayName}
                         email={user.email ?? null}
-                        avatarUrl={profile.avatar_url}
+                        avatarUrl={profile?.avatar_url}
                         initialIsLight={isLight}
-                        organizationType={membership.organization.type}
+                        organizationType={organizationType}
                     />
                 }
             >

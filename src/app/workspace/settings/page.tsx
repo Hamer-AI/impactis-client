@@ -246,29 +246,18 @@ export default async function WorkspaceSettingsPage({
 
     const cookieStore = await cookies()
     const themeCookie = cookieStore.get('workspace_theme')?.value
-    const isLight = themeCookie === 'light'
+    const isLight = themeCookie !== 'dark'
 
     const canEdit = membership.member_role === 'owner'
     const canManageBilling = membership.member_role === 'owner' || membership.member_role === 'admin'
     const settingsPropertyBlueprint: Omit<SettingsSectionItem, 'href' | 'active'>[] = membership.organization.type === 'startup'
-        ? [
-            { id: 'settings-identity', label: 'Organization Identity', icon: 'identity' },
-            { id: 'settings-billing', label: 'Subscription & Billing', icon: 'billing' },
-            { id: 'settings-startup-readiness', label: 'Startup Profile', icon: 'readiness' },
-            { id: 'settings-discovery', label: 'Discovery Post', icon: 'discovery' },
-            { id: 'settings-data-room', label: 'Investor Data Room', icon: 'dataroom' },
-            { id: 'settings-invites', label: 'Team Invites', icon: 'invites' },
-            { id: 'settings-permissions', label: 'Permission Rules', icon: 'permissions' },
-            { id: 'settings-readiness-rules', label: 'Readiness Qualification Rules', icon: 'rules' },
-        ]
+        ? [{ id: 'settings-identity', label: 'Organization Identity', icon: 'identity' }]
         : [
             { id: 'settings-identity', label: 'Organization Identity', icon: 'identity' },
-            { id: 'settings-billing', label: 'Subscription & Billing', icon: 'billing' },
-            { id: 'settings-invites', label: 'Team Invites', icon: 'invites' },
-            { id: 'settings-permissions', label: 'Permission Rules', icon: 'permissions' },
             { id: 'settings-team-access', label: 'Team Access', icon: 'team' },
         ]
-    const allowedSectionIds = new Set(settingsPropertyBlueprint.map((section) => section.id))
+    // Allow deep links even if not shown in the Organization settings navigator (e.g. Syndicate → team invites).
+    const allowedSectionIds = new Set([...settingsPropertyBlueprint.map((section) => section.id), 'settings-billing', 'settings-invites'])
     const activeSectionId = requestedSection && allowedSectionIds.has(requestedSection)
         ? requestedSection
         : settingsPropertyBlueprint[0]?.id ?? 'settings-identity'

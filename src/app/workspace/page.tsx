@@ -542,7 +542,10 @@ function CoreTeamPanel(input: {
     textMainClassName: string
     textMutedClassName: string
     tableRowClassName: string
+    forceLight?: boolean
 }) {
+    const borderClass = input.forceLight ? 'border-slate-200/60 dark:!border-slate-200' : 'border-slate-200/60 dark:border-slate-800/60'
+    const divideClass = input.forceLight ? 'divide-slate-100 dark:!divide-slate-200' : 'divide-slate-100 dark:divide-slate-800/50'
     return (
         <Card className={input.cardClassName}>
             <CardHeader className="pb-3">
@@ -559,8 +562,8 @@ function CoreTeamPanel(input: {
                         No members found.
                     </div>
                 ) : (
-                    <div className="overflow-hidden rounded-lg border border-slate-200/60 dark:border-slate-800/60">
-                        <div className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                    <div className={`overflow-hidden rounded-lg ${borderClass}`}>
+                        <div className={`divide-y ${divideClass}`}>
                             {input.members.map((member) => {
                                 const displayName = member.full_name ?? `Member ${member.user_id.slice(0, 8)}`
                                 const joinedLabel = member.joined_at ? formatDate(member.joined_at) : 'Unknown'
@@ -571,7 +574,7 @@ function CoreTeamPanel(input: {
                                         className={`flex items-center justify-between gap-3 px-3 py-3 transition-colors ${input.tableRowClassName}`}
                                     >
                                         <div className="flex min-w-0 items-center gap-2.5">
-                                            <Avatar className="h-8 w-8 border-2 border-white dark:border-slate-800 shadow-sm">
+                                            <Avatar className={`h-8 w-8 border-2 shadow-sm ${input.forceLight ? 'border-slate-200 dark:!border-slate-200' : 'border-white dark:border-slate-800'}`}>
                                                 <AvatarImage src={member.avatar_url ?? undefined} alt={displayName} />
                                                 <AvatarFallback className="bg-gradient-to-br from-emerald-600 to-emerald-500 text-[10px] font-bold text-white uppercase">
                                                     {getInitials(member.full_name, 'U')}
@@ -685,7 +688,7 @@ export default async function WorkspacePage(props: WorkspacePageProps) {
     // Read theme from cookies for consistent SSR
     const cookieStore = await cookies()
     const themeCookie = cookieStore.get('workspace_theme')?.value
-    const isLight = themeCookie === 'light'
+    const isLight = themeCookie !== 'dark'
 
     const firstName = profile.full_name?.trim().split(/\s+/)[0] ?? 'there'
     const workspaceLabel = `${toTitleCase(membership.organization.type)} workspace`
@@ -773,7 +776,7 @@ export default async function WorkspacePage(props: WorkspacePageProps) {
         ? 'border-emerald-200 bg-emerald-50 text-emerald-700 shadow-sm'
         : 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300 shadow-sm shadow-emerald-950/20'
     const navIdleClass = isLight
-        ? 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
+        ? 'text-slate-600 hover:bg-emerald-50 hover:text-emerald-800'
         : 'text-slate-300 hover:bg-slate-800 hover:text-slate-100'
     const tableRowClass = isLight
         ? 'border-slate-100 hover:bg-slate-50/50'
@@ -940,11 +943,12 @@ export default async function WorkspacePage(props: WorkspacePageProps) {
                             <CoreTeamPanel
                                 members={organizationCoreTeam}
                                 currentUserId={user.id}
-                                cardClassName={`${panelClass} border-none shadow-none rounded-[3rem] p-8`}
-                                mutedCardClassName={mutedPanelClass}
-                                textMainClassName={textMainClass}
-                                textMutedClassName={textMutedClass}
-                                tableRowClassName={tableRowClass}
+                                cardClassName="border-slate-200 bg-white dark:!bg-white dark:!border-slate-200 shadow-sm ring-1 ring-slate-200/40 border-none rounded-[3rem] p-8"
+                                mutedCardClassName="border-slate-100 bg-slate-100/50"
+                                textMainClassName="text-slate-900 dark:text-slate-900"
+                                textMutedClassName="text-slate-500 dark:text-slate-600"
+                                tableRowClassName="border-slate-100 hover:bg-slate-50/50"
+                                forceLight
                             />
 
                         </div>

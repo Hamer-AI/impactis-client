@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { authClient } from '@/lib/auth-client'
-import { getDashboardPathForRole, mapLoginErrorMessage, sanitizeNextPath } from '@/modules/auth'
+import { mapLoginErrorMessage, sanitizeNextPath } from '@/modules/auth'
 import TurnstileWidget from '@/components/auth/TurnstileWidget'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -53,8 +53,8 @@ export default function LoginPage() {
         }
         setIsLoading(true)
         try {
-            const dashboardPath = getDashboardPathForRole(null)
-            const baseNextPath = nextPath ?? `${dashboardPath}?refresh=1`
+            const landingPath = '/'
+            const baseNextPath = nextPath ?? landingPath
             const origin = typeof window !== 'undefined' ? window.location.origin : ''
             const callbackURL =
                 baseNextPath.startsWith('http://') || baseNextPath.startsWith('https://')
@@ -80,8 +80,7 @@ export default function LoginPage() {
             }
             toast.success('Successfully logged in!')
             const queryNextPath = sanitizeNextPath(new URLSearchParams(window.location.search).get('next'))
-            const basePath = nextPath ?? queryNextPath ?? getDashboardPathForRole(null)
-            const redirectPath = basePath === '/workspace' ? `${basePath}?refresh=1` : basePath
+            const redirectPath = nextPath ?? queryNextPath ?? landingPath
             router.push(redirectPath)
         } catch (err) {
             console.error('Unexpected auth catch:', err)

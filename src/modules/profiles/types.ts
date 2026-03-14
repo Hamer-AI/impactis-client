@@ -10,4 +10,6 @@ export type UserProfile = {
     linkedin_url: string | null
     timezone_name: string | null
     preferred_contact_method: 'email' | 'phone' | 'linkedin' | null
+    /** 0-100, persisted when profile is saved */
+    profile_completeness_percent: number | null
 }

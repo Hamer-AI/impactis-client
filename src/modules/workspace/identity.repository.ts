@@ -24,14 +24,24 @@ import type {
 } from '@/modules/startups'
 import { mapBillingCurrentPlan } from '@/modules/billing'
 import type {
+    UnifiedDiscoveryCard,
     WorkspaceBootstrapSnapshot,
     WorkspaceOrganizationReadinessSnapshot,
 } from './types'
 
 export const WORKSPACE_IDENTITY_CACHE_TAG = 'workspace-identity'
 
+export type OnboardingProgressSnapshot = {
+    total_stages: number
+    completed_stages: number
+    is_completed: boolean
+}
+
 export type WorkspaceIdentitySnapshot = {
     profile: UserProfile
+    onboarding_progress: OnboardingProgressSnapshot | null
+    /** Onboarding form details per org type (e.g. startup: { companyName, websiteUrl, ... }). */
+    onboarding_details: Record<string, Record<string, unknown>> | null
     membership: OrganizationMembership | null
 }
 
@@ -72,7 +82,33 @@ const WORKSPACE_SNAPSHOT_CACHE_MAX_ENTRIES = 500
 
 type WorkspaceIdentityApiResponse = {
     profile: unknown
+    onboarding_progress?: unknown
+    onboarding_details?: unknown
     membership: unknown
+}
+
+function mapOnboardingProgress(value: unknown): OnboardingProgressSnapshot | null {
+    if (!value || typeof value !== 'object') return null
+    const row = value as Record<string, unknown>
+    const total = typeof row.total_stages === 'number' && row.total_stages >= 1 ? Math.min(20, row.total_stages) : 0
+    const completed = typeof row.completed_stages === 'number' && row.completed_stages >= 0 ? Math.min(total, row.completed_stages) : 0
+    if (total === 0) return null
+    return {
+        total_stages: total,
+        completed_stages: completed,
+        is_completed: row.is_completed === true,
+    }
+}
+
+function mapOnboardingDetails(value: unknown): Record<string, Record<string, unknown>> | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+    const outer = value as Record<string, unknown>
+    const result: Record<string, Record<string, unknown>> = {}
+    for (const key of Object.keys(outer)) {
+        const v = outer[key]
+        if (v && typeof v === 'object' && !Array.isArray(v)) result[key] = v as Record<string, unknown>
+    }
+    return Object.keys(result).length ? result : null
 }
 
 type WorkspaceBootstrapApiResponse = {
@@ -83,6 +119,7 @@ type WorkspaceBootstrapApiResponse = {
     organization_core_team: unknown
     organization_readiness: unknown
     startup_discovery_feed: unknown
+    discovery_feed: unknown
     startup_readiness: unknown
 }
 
@@ -277,6 +314,12 @@ function normalizeStartupReadinessSectionScores(value: unknown): StartupReadines
         .filter((item): item is StartupReadinessSectionScore => !!item)
 }
 
+function normalizeProfileCompletenessPercent(value: unknown): number | null {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return null
+    const n = Math.round(value)
+    return n >= 0 && n <= 100 ? n : null
+}
+
 function getEmptyProfileFallback(userId: string): UserProfile {
     return {
         id: userId,
@@ -290,6 +333,7 @@ function getEmptyProfileFallback(userId: string): UserProfile {
         linkedin_url: null,
         timezone_name: null,
         preferred_contact_method: null,
+        profile_completeness_percent: null,
     }
 }
 
@@ -311,6 +355,7 @@ function mapProfile(value: unknown, userId: string): UserProfile {
         linkedin_url: normalizeText(row.linkedin_url),
         timezone_name: normalizeText(row.timezone_name),
         preferred_contact_method: normalizePreferredContactMethod(row.preferred_contact_method),
+        profile_completeness_percent: normalizeProfileCompletenessPercent(row.profile_completeness_percent),
     }
 }
 
@@ -489,6 +534,28 @@ function mapStartupDiscoveryFeedItem(value: unknown): StartupDiscoveryFeedItem |
             row.startup_verification_status
         ),
         need_advisor: needAdvisor,
+        logo_url: normalizeText(row.logo_url),
+    }
+}
+
+function mapUnifiedDiscoveryCard(value: unknown): UnifiedDiscoveryCard | null {
+    if (!value || typeof value !== 'object') return null
+    const row = value as Record<string, unknown>
+    const org_id = normalizeText(row.org_id)
+    const org_type = row.org_type === 'startup' || row.org_type === 'investor' || row.org_type === 'advisor' ? row.org_type : null
+    const name = normalizeText(row.name)
+    const description = normalizeText(row.description) ?? ''
+    if (!org_id || !org_type || !name) return null
+    return {
+        org_id,
+        org_type,
+        name,
+        description,
+        industry_or_expertise: normalizeArray(row.industry_or_expertise),
+        stage: normalizeText(row.stage),
+        location: normalizeText(row.location),
+        image_url: normalizeText(row.image_url),
+        id: normalizeText(row.id) ?? undefined,
     }
 }
 
@@ -536,6 +603,8 @@ export async function getWorkspaceIdentityForUser(
     if (!data) {
         const fallback: WorkspaceIdentitySnapshot = {
             profile: getEmptyProfileFallback(user.id),
+            onboarding_progress: null,
+            onboarding_details: null,
             membership: null,
         }
         setCacheEntryValue(workspaceIdentitySnapshotCache, cacheKey, fallback)
@@ -544,6 +613,8 @@ export async function getWorkspaceIdentityForUser(
 
     const snapshot: WorkspaceIdentitySnapshot = {
         profile: mapProfile(data.profile, user.id),
+        onboarding_progress: mapOnboardingProgress(data.onboarding_progress),
+        onboarding_details: mapOnboardingDetails(data.onboarding_details),
         membership: mapMembership(data.membership),
     }
     setCacheEntryValue(workspaceIdentitySnapshotCache, cacheKey, snapshot)
@@ -562,6 +633,7 @@ function buildSnapshotFromBootstrapResponse(
         organization_core_team: mapArray(data.organization_core_team, mapOrganizationCoreTeamMember),
         organization_readiness: mapOrganizationReadiness(data.organization_readiness),
         startup_discovery_feed: mapArray(data.startup_discovery_feed, mapStartupDiscoveryFeedItem),
+        discovery_feed: mapArray(data.discovery_feed, mapUnifiedDiscoveryCard),
         startup_readiness: mapStartupReadiness(data.startup_readiness),
     }
 }
@@ -593,6 +665,7 @@ export async function getWorkspaceBootstrapForCurrentUser(
         organization_core_team: [],
         organization_readiness: null,
         startup_discovery_feed: [],
+        discovery_feed: [],
         startup_readiness: null,
     }
 
@@ -639,6 +712,7 @@ export async function getWorkspaceBootstrapForCurrentUser(
             organization_core_team: [],
             organization_readiness: null,
             startup_discovery_feed: [],
+            discovery_feed: [],
             startup_readiness: null,
         }
         setCacheEntryValue(workspaceBootstrapSnapshotCache, cacheKey, minimalSnapshot)

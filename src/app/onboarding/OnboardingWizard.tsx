@@ -27,7 +27,7 @@ function Stepper(input: {
     onClickCompleted: (idx: number) => void
 }) {
     return (
-        <ol className="flex items-center gap-2">
+        <ol className="flex items-center gap-3">
             {input.steps.map((s, idx) => {
                 const done = idx < input.currentIndex
                 const active = idx === input.currentIndex
@@ -37,7 +37,7 @@ function Stepper(input: {
                             type="button"
                             onClick={() => (done ? input.onClickCompleted(idx) : null)}
                             className={cn(
-                                'flex h-9 w-9 items-center justify-center rounded-full border text-xs font-black transition',
+                                'flex h-11 w-11 shrink-0 items-center justify-center rounded-full border text-sm font-black transition',
                                 done
                                     ? 'border-emerald-600 bg-emerald-600 text-white hover:opacity-90'
                                     : active
@@ -49,11 +49,11 @@ function Stepper(input: {
                         >
                             {idx + 1}
                         </button>
-                        <span className={cn('hidden text-sm font-bold sm:block', active ? 'text-slate-900 dark:text-slate-100' : 'text-slate-500 dark:text-slate-400')}>
+                        <span className={cn('hidden text-base font-bold sm:block', active ? 'text-slate-900 dark:text-slate-100' : 'text-slate-500 dark:text-slate-400')}>
                             {s.label}
                         </span>
                         {idx < input.steps.length - 1 ? (
-                            <div className={cn('h-0.5 w-10 rounded-full', done ? 'bg-emerald-600' : 'bg-slate-200 dark:bg-slate-800')} />
+                            <div className={cn('h-0.5 w-12 rounded-full', done ? 'bg-emerald-600' : 'bg-slate-200 dark:bg-slate-800')} />
                         ) : null}
                     </li>
                 )
@@ -75,10 +75,14 @@ export function OnboardingWizard<TValues extends Record<string, unknown>>(props:
     const [currentIndex, setCurrentIndex] = useState(Math.max(0, Math.min(props.steps.length - 1, props.initialStep)))
     const step = props.steps[currentIndex]
 
+    const hasInitialValues = props.initialValues && Object.keys(props.initialValues as Record<string, unknown>).length > 0
+
     useEffect(() => {
         store.setRole(props.role)
         store.setStepIndex(currentIndex)
-        store.mergeValues(props.initialValues as Record<string, unknown>)
+        if (hasInitialValues) {
+            store.mergeValues(props.initialValues as Record<string, unknown>)
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
@@ -87,11 +91,18 @@ export function OnboardingWizard<TValues extends Record<string, unknown>>(props:
     const form = useForm<TValues>({
         resolver: zodResolver(schema),
         defaultValues: {
-            ...(props.initialValues as any),
             ...(store.values as any),
+            ...(props.initialValues as any),
         } as any,
         mode: 'onBlur',
     })
+
+    useEffect(() => {
+        if (hasInitialValues && (props.initialValues as Record<string, unknown>)) {
+            form.reset(props.initialValues as any)
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [hasInitialValues])
 
     const stepCount = props.steps.length
     const canBack = currentIndex > 0
@@ -115,6 +126,7 @@ export function OnboardingWizard<TValues extends Record<string, unknown>>(props:
             await save({
                 role: props.role,
                 stepIndex: currentIndex,
+                totalSteps: stepCount,
                 values: values as any,
                 completed: input.completed,
                 skipped: input.skipped,
@@ -164,13 +176,13 @@ export function OnboardingWizard<TValues extends Record<string, unknown>>(props:
     }
 
     return (
-        <div className="w-full max-w-3xl">
+        <div className="w-full max-w-4xl">
             <Card className="shadow-xl overflow-hidden">
-                <CardHeader className="space-y-4">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <CardHeader className="space-y-5 px-6 py-6 sm:px-8 sm:py-8">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div>
-                            <CardTitle className="text-2xl font-black">Onboarding</CardTitle>
-                            <CardDescription>
+                            <CardTitle className="text-3xl font-black tracking-tight">Onboarding</CardTitle>
+                            <CardDescription className="mt-1.5 text-base font-semibold">
                                 Step {currentIndex + 1} of {stepCount}
                             </CardDescription>
                         </div>
@@ -186,7 +198,7 @@ export function OnboardingWizard<TValues extends Record<string, unknown>>(props:
                     </div>
                 </CardHeader>
 
-                <CardContent>
+                <CardContent className="px-6 pb-8 pt-2 sm:px-8 sm:pb-10">
                     <AnimatePresence mode="wait">
                         <motion.div
                             key={step.id}
@@ -199,30 +211,30 @@ export function OnboardingWizard<TValues extends Record<string, unknown>>(props:
                         </motion.div>
                     </AnimatePresence>
 
-                    <div className="mt-8 border-t border-slate-200 pt-5 dark:border-slate-800">
-                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="mt-10 border-t border-slate-200 pt-6 dark:border-slate-800">
+                        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
                             <div className="flex items-center gap-3">
                                 {canBack ? (
-                                    <Button type="button" variant="secondary" onClick={onBack}>
+                                    <Button type="button" variant="secondary" onClick={onBack} className="min-h-11 px-5 text-base font-semibold">
                                         Back
                                     </Button>
                                 ) : null}
                             </div>
-                            <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-4">
-                                <div className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                            <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center sm:gap-5">
+                                <div className="text-sm font-bold text-slate-500 dark:text-slate-400">
                                     Step {currentIndex + 1} of {stepCount}
                                 </div>
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-4">
                                     {canSkip ? (
                                         <button
                                             type="button"
                                             onClick={onSkip}
-                                            className="text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                                            className="text-sm font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                                         >
                                             Skip for now
                                         </button>
                                     ) : null}
-                                    <Button type="button" onClick={onNext}>
+                                    <Button type="button" onClick={onNext} className="min-h-11 px-6 text-base font-semibold">
                                         {currentIndex === stepCount - 1 ? 'Finish' : 'Next'}
                                     </Button>
                                 </div>

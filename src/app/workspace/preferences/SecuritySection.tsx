@@ -64,10 +64,8 @@ function PasswordField(input: {
 }) {
     const [visible, setVisible] = useState(false)
 
-    const inputClass = input.isLight
-        ? 'border-slate-200 bg-white text-slate-900 placeholder:text-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10'
-        : 'border-slate-800 bg-slate-950/60 text-slate-100 placeholder:text-slate-600 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/10'
-    const labelClass = input.isLight ? 'text-slate-600' : 'text-slate-400'
+    const inputClass = 'border-slate-200 bg-white dark:!bg-white dark:!border-slate-200 text-slate-900 dark:!text-slate-900 placeholder:text-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10'
+    const labelClass = 'text-slate-600 dark:!text-slate-600'
 
     return (
         <div className="space-y-2">
@@ -76,14 +74,14 @@ function PasswordField(input: {
                     {input.label}
                 </Label>
                 {input.hint && (
-                    <span className={`text-[10px] font-medium ${input.isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+                    <span className="text-[10px] font-medium text-slate-400 dark:!text-slate-500">
                         {input.hint}
                     </span>
                 )}
             </div>
             <div className="relative group">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-                    <Lock className={`h-3.5 w-3.5 transition-colors ${input.value ? 'text-emerald-500' : input.isLight ? 'text-slate-300' : 'text-slate-600'}`} />
+                    <Lock className={`h-3.5 w-3.5 transition-colors ${input.value ? 'text-emerald-500' : 'text-slate-300 dark:!text-slate-400'}`} />
                 </div>
                 <Input
                     id={input.id}
@@ -99,7 +97,7 @@ function PasswordField(input: {
                     variant="ghost"
                     size="icon"
                     onClick={() => setVisible((v) => !v)}
-                    className={`absolute inset-y-0 right-3 h-auto w-auto text-slate-400 hover:text-slate-600 ${input.isLight ? 'hover:bg-slate-100' : 'hover:bg-slate-800'}`}
+                    className="absolute inset-y-0 right-3 h-auto w-auto text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:!text-slate-500 dark:hover:!text-slate-700 dark:hover:!bg-slate-100"
                     aria-label={visible ? 'Hide password' : 'Show password'}
                 >
                     {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}

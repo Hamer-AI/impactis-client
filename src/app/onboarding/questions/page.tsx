@@ -1,12 +1,64 @@
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { Pool } from 'pg'
 import { auth } from '@/lib/auth'
 import { getDashboardPathForRole, getPostAuthRedirectPath } from '@/modules/auth'
 import { getOnboardingPath } from '@/modules/onboarding'
 import { hasOrganizationMembershipForUser } from '@/modules/organizations'
 import { OnboardingEntryClient } from '../OnboardingEntryClient'
 
-export default async function OnboardingQuestionsPage() {
+function getPool(): Pool {
+    const databaseUrl = process.env.DATABASE_URL
+    if (!databaseUrl) throw new Error('DATABASE_URL is not configured')
+    const pool = new Pool({ connectionString: databaseUrl })
+    pool.on('connect', (client) => {
+        client.query('SET search_path TO public')
+    })
+    return pool
+}
+
+async function getOnboardingDetailsFromDb(userId: string, role: string): Promise<Record<string, unknown>> {
+    let pool: Pool | null = null
+    try {
+        pool = getPool()
+        const orgType = role === 'startup' ? 'startup' : role === 'investor' ? 'investor' : 'advisor'
+        const rows = await pool.query<{ details: unknown }>(
+            `select details from public.user_onboarding_details where user_id = $1::uuid and organization_type = $2::text limit 1`,
+            [userId, orgType]
+        )
+        const row = rows.rows[0]
+        if (row?.details && typeof row.details === 'object' && !Array.isArray(row.details)) {
+            return row.details as Record<string, unknown>
+        }
+        const metaRows = await pool.query<{ raw_user_meta_data: unknown }>(
+            `select raw_user_meta_data from public.users where id = $1::uuid limit 1`,
+            [userId]
+        )
+        const meta = metaRows.rows[0]?.raw_user_meta_data
+        if (meta && typeof meta === 'object' && !Array.isArray(meta)) {
+            const data = (meta as Record<string, unknown>).onboardingData
+            const roleData = data && typeof data === 'object' && (data as Record<string, unknown>)[role]
+            if (roleData && typeof roleData === 'object' && !Array.isArray(roleData)) {
+                return roleData as Record<string, unknown>
+            }
+        }
+    } catch {
+        /* DATABASE_URL missing or table missing: fall back to metadata */
+    } finally {
+        if (pool) {
+            try {
+                await pool.end()
+            } catch {
+                /* ignore */
+            }
+        }
+    }
+    return {}
+}
+
+export default async function OnboardingQuestionsPage(props: {
+    searchParams?: Promise<{ view?: string }> | { view?: string }
+}) {
     const session = await auth.api.getSession({
         headers: await headers(),
     })
@@ -26,18 +78,20 @@ export default async function OnboardingQuestionsPage() {
         redirect(getOnboardingPath())
     }
 
+    const rawParams = props.searchParams ?? {}
+    const searchParams = typeof (rawParams as Promise<unknown>).then === 'function'
+        ? await (rawParams as Promise<{ view?: string }>)
+        : (rawParams as { view?: string })
+    const isViewMode = searchParams?.view === '1'
+
     const questionnaire = (metadata.onboarding_questionnaire ?? null) as
-        | {
-              completed?: boolean
-              skipped?: boolean
-          }
+        | { completed?: boolean; skipped?: boolean }
         | null
     const onboardingCompletedFlag = metadata.onboardingCompleted === true
     const onboardingSkippedFlag = metadata.onboardingSkipped === true
     const questionnaireDone = questionnaire?.completed === true || questionnaire?.skipped === true
 
-    if (onboardingCompletedFlag || onboardingSkippedFlag || questionnaireDone) {
-        // Prefer role-based dashboard path when available; fall back to generic post-auth redirect.
+    if (!isViewMode && (onboardingCompletedFlag || onboardingSkippedFlag || questionnaireDone)) {
         const destination =
             typeof metadata.role !== 'undefined'
                 ? getDashboardPathForRole(metadata.role)
@@ -54,12 +108,19 @@ export default async function OnboardingQuestionsPage() {
 
     const onboardingStep =
         typeof metadata.onboardingStep === 'number' ? Math.max(0, Math.trunc(metadata.onboardingStep)) : 0
-    const onboardingData = (metadata.onboardingData && typeof metadata.onboardingData === 'object' && metadata.onboardingData !== null)
-        ? (metadata.onboardingData as Record<string, unknown>)
-        : {}
-    const initialValues = (onboardingData[role] && typeof onboardingData[role] === 'object' && onboardingData[role] !== null)
-        ? (onboardingData[role] as Record<string, unknown>)
-        : {}
+
+    const metadataOnboardingData =
+        metadata.onboardingData && typeof metadata.onboardingData === 'object' && metadata.onboardingData !== null
+            ? (metadata.onboardingData as Record<string, unknown>)
+            : {}
+    const metadataRoleData =
+        metadataOnboardingData[role] && typeof metadataOnboardingData[role] === 'object' && metadataOnboardingData[role] !== null
+            ? (metadataOnboardingData[role] as Record<string, unknown>)
+            : {}
+
+    const dbDetails = await getOnboardingDetailsFromDb(user.id, role)
+    const initialValues =
+        Object.keys(dbDetails).length > 0 ? { ...metadataRoleData, ...dbDetails } : metadataRoleData
 
     return (
         <main className="min-h-screen bg-white px-4 py-10 text-slate-900 dark:bg-slate-950 dark:text-slate-100">

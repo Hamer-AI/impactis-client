@@ -3,6 +3,7 @@ import { useCallback } from 'react'
 type SaveOptions = {
     role: string
     stepIndex: number
+    totalSteps: number
     values: Record<string, unknown>
     completed?: boolean
     skipped?: boolean

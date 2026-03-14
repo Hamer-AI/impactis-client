@@ -6,6 +6,7 @@ import { auth } from '@/lib/auth'
 type SaveOnboardingPayload = {
     role: string
     stepIndex: number
+    totalSteps?: number
     values: Record<string, unknown>
     completed?: boolean
     skipped?: boolean
@@ -18,7 +19,7 @@ function getPool(): Pool {
     }
     const pool = new Pool({ connectionString: databaseUrl })
     pool.on('connect', (client) => {
-        client.query('SET search_path TO auth, public')
+        client.query('SET search_path TO public')
     })
     return pool
 }
@@ -36,6 +37,7 @@ export async function POST(request: Request) {
         const body = (await request.json()) as SaveOnboardingPayload
         const role = typeof body.role === 'string' ? body.role.trim() : ''
         const stepIndex = Number.isFinite(body.stepIndex) ? body.stepIndex : 0
+        const totalSteps = Number.isFinite(body.totalSteps) && body.totalSteps! > 0 ? Math.min(20, Math.round(body.totalSteps!)) : 6
         const completed = body.completed === true
         const skipped = body.skipped === true
         const values = body.values && typeof body.values === 'object' && body.values !== null ? body.values : {}
@@ -93,9 +95,49 @@ export async function POST(request: Request) {
         const pool = getPool()
         try {
             await pool.query(
-                `update auth.users set raw_user_meta_data = $1::jsonb, updated_at = timezone('utc', now()) where id = $2::uuid`,
+                `update public.users set raw_user_meta_data = $1::jsonb, updated_at = timezone('utc', now()) where id = $2::uuid`,
                 [JSON.stringify(nextMeta), user.id]
             )
+            const orgType = roleKey === 'startup' ? 'startup' : roleKey === 'investor' ? 'investor' : 'advisor'
+            const completedStages = onboardingCompleted ? totalSteps : Math.min(totalSteps, Math.max(0, stepIndex + 1))
+            try {
+                await pool.query(
+                    `
+                    insert into public.user_onboarding_progress (user_id, organization_type, total_stages, completed_stages, is_completed, completed_at, updated_at)
+                    values ($1::uuid, $2::text, $3::smallint, $4::smallint, $5::boolean, $6::timestamptz, timezone('utc', now()))
+                    on conflict (user_id, organization_type) do update set
+                      total_stages = excluded.total_stages,
+                      completed_stages = excluded.completed_stages,
+                      is_completed = excluded.is_completed,
+                      completed_at = excluded.completed_at,
+                      updated_at = timezone('utc', now())
+                    `,
+                    [
+                        user.id,
+                        orgType,
+                        totalSteps,
+                        completedStages,
+                        onboardingCompleted,
+                        onboardingCompleted ? new Date().toISOString() : null,
+                    ]
+                )
+            } catch {
+                // Table may not exist yet; metadata save already succeeded
+            }
+            try {
+                await pool.query(
+                    `
+                    insert into public.user_onboarding_details (user_id, organization_type, details, updated_at)
+                    values ($1::uuid, $2::text, $3::jsonb, timezone('utc', now()))
+                    on conflict (user_id, organization_type) do update set
+                      details = excluded.details,
+                      updated_at = timezone('utc', now())
+                    `,
+                    [user.id, orgType, JSON.stringify(nextRoleData)]
+                )
+            } catch {
+                // Table may not exist yet
+            }
         } finally {
             await pool.end()
         }

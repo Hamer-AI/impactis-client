@@ -7,6 +7,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 
+const inputClass = 'min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold text-slate-900 outline-none focus:border-[#0B3D2E] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100'
+const labelClass = 'text-base font-bold'
+
 function SelectField(input: {
     label: string
     name: keyof StartupOnboardingValues
@@ -19,10 +22,10 @@ function SelectField(input: {
             name={input.name as any}
             render={({ field }) => (
                 <FormItem>
-                    <FormLabel>{input.label}</FormLabel>
+                    <FormLabel className={labelClass}>{input.label}</FormLabel>
                     <FormControl>
                         <select
-                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-[#0B3D2E] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                            className={inputClass}
                             value={(field.value as any) ?? ''}
                             onChange={(e) => field.onChange(e.target.value)}
                         >
@@ -99,15 +102,15 @@ export function getStartupSteps(): Array<StepConfig<StartupOnboardingValues>> {
             fields: ['companyName', 'companyStage', 'industry', 'countryOfIncorporation', 'websiteUrl'],
             render: (form) => (
                 <Form {...form}>
-                    <div className="grid gap-5 sm:grid-cols-2">
+                    <div className="grid gap-6 sm:grid-cols-2">
                         <FormField
                             control={form.control}
                             name="companyName"
                             render={({ field }) => (
                                 <FormItem className="sm:col-span-2">
-                                    <FormLabel>Company Name</FormLabel>
+                                    <FormLabel className={labelClass}>Company Name</FormLabel>
                                     <FormControl>
-                                        <Input placeholder="Your company name" {...field} />
+                                        <Input className={inputClass} placeholder="Your company name" {...field} value={(field.value as any) ?? ''} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -118,9 +121,9 @@ export function getStartupSteps(): Array<StepConfig<StartupOnboardingValues>> {
                             name="websiteUrl"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Website URL (optional)</FormLabel>
+                                    <FormLabel className={labelClass}>Website URL (optional)</FormLabel>
                                     <FormControl>
-                                        <Input placeholder="https://..." {...field} value={(field.value as any) ?? ''} />
+                                        <Input className={inputClass} placeholder="https://..." {...field} value={(field.value as any) ?? ''} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -133,9 +136,9 @@ export function getStartupSteps(): Array<StepConfig<StartupOnboardingValues>> {
                             name="countryOfIncorporation"
                             render={({ field }) => (
                                 <FormItem className="sm:col-span-2">
-                                    <FormLabel>Country of Incorporation</FormLabel>
+                                    <FormLabel className={labelClass}>Country of Incorporation</FormLabel>
                                     <FormControl>
-                                        <Input placeholder="e.g. Ethiopia" {...field} />
+                                        <Input className={inputClass} placeholder="e.g. Ethiopia" {...field} value={(field.value as any) ?? ''} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>

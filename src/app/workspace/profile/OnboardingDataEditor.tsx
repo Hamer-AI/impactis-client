@@ -56,7 +56,7 @@ export default function OnboardingDataEditor({ role, initialValues }: Props) {
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                         {keys.length === 0 ? (
-                            <div className="text-sm font-semibold text-slate-500">No saved onboarding fields yet.</div>
+                            <div className="text-sm font-semibold text-slate-500 dark:text-slate-400">No saved onboarding fields yet.</div>
                         ) : (
                             <div className="grid gap-4 sm:grid-cols-2">
                                 {keys.map((k) => (
@@ -70,7 +70,7 @@ export default function OnboardingDataEditor({ role, initialValues }: Props) {
                                             const isArray = Array.isArray(v)
                                             return (
                                                 <FormItem className={isLong ? 'sm:col-span-2' : ''}>
-                                                    <FormLabel className="text-xs font-black uppercase tracking-widest text-slate-500">
+                                                    <FormLabel className="text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
                                                         {k}
                                                     </FormLabel>
                                                     <FormControl>
@@ -110,7 +110,7 @@ export default function OnboardingDataEditor({ role, initialValues }: Props) {
 
                         <div className="flex items-center gap-3">
                             <Button type="submit">Save changes</Button>
-                            {status ? <span className="text-sm font-semibold text-slate-500">{status}</span> : null}
+                            {status ? <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">{status}</span> : null}
                         </div>
                     </form>
                 </Form>
