@@ -145,7 +145,9 @@ export default function BillingPlanManager({
     const selectedPriceLabel = selectedPlan
         ? formatCurrencyFromCents(selectedAmountCents, selectedPlan.pricing.currency)
         : null
-    const isPaidSelection = (selectedAmountCents ?? 0) > 0
+    // "Paid" is determined by tier, not by the (sometimes missing) demo price fields.
+    // This keeps the Stripe/telebirr/mpesa actions usable even if annual price rows aren't seeded.
+    const isPaidSelection = (selectedPlan?.tier ?? 0) > 0
     const primaryActionLabel = isPending
         ? 'Processing...'
         : (billingStripeRedirectEnabled && isPaidSelection)
@@ -432,8 +434,7 @@ export default function BillingPlanManager({
                     ) : null}
                     </CardContent>
                 </Card>
-            </form>
-            <Card className={cardClass}>
+                <Card className={cardClass}>
                 <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className={`text-sm font-semibold ${titleClass}`}>Payment transactions</CardTitle>
                     <div className="flex items-center gap-2">
@@ -446,19 +447,42 @@ export default function BillingPlanManager({
                     <div className="flex flex-wrap items-center justify-between gap-3 pb-4">
                         <div className={`text-sm ${textMutedClass}`}>
                                 {billingStripeRedirectEnabled
-                                    ? 'Stripe checkout is enabled (use Continue to Checkout for paid plans).'
+                                    ? 'Stripe checkout is enabled. You can pay with Stripe or use Telebirr/M-Pesa demo init endpoints.'
                                     : 'Stripe checkout is disabled here; Telebirr/M-Pesa demo init endpoints are available.'}
                         </div>
-                            {billingStripeRedirectEnabled ? null : (
-                                <div className="flex gap-2">
-                                    <Button type="button" size="sm" variant="outline" className="rounded-lg" onClick={startTelebirr}>
-                                        Telebirr (demo)
-                                    </Button>
-                                    <Button type="button" size="sm" variant="outline" className="rounded-lg" onClick={startMpesa}>
-                                        M-Pesa (demo)
-                                    </Button>
-                                </div>
-                            )}
+                        <div className="flex flex-wrap gap-2">
+                            {billingStripeRedirectEnabled ? (
+                                <Button
+                                    type="submit"
+                                    size="sm"
+                                    variant="outline"
+                                    className="rounded-lg"
+                                    disabled={!canManage || isPending || !selectedPlan || !selectedInterval || !isPaidSelection}
+                                >
+                                    Pay with Stripe
+                                </Button>
+                            ) : null}
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="rounded-lg"
+                                onClick={startTelebirr}
+                                disabled={!canManage || isPending || !selectedPlan || !selectedInterval || !isPaidSelection}
+                            >
+                                Telebirr (demo)
+                            </Button>
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="rounded-lg"
+                                onClick={startMpesa}
+                                disabled={!canManage || isPending || !selectedPlan || !selectedInterval || !isPaidSelection}
+                            >
+                                M-Pesa (demo)
+                            </Button>
+                        </div>
                     </div>
                     <Table>
                         <TableHeader>
@@ -488,7 +512,8 @@ export default function BillingPlanManager({
                     </Table>
                 </CardContent>
             </Card>
-            </CardContent>
+            </form>
+        </CardContent>
         </Card>
     )
 }
