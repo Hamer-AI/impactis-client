@@ -245,3 +245,123 @@ export async function updateDealRoomStage(dealRoomId: string, stage: string, not
     return (res.data as any) ?? { error: 'Failed to update stage' }
 }
 
+export type DealRoomAgreementRow = {
+    id: string
+    title: string
+    status: string
+    updated_at: string
+}
+
+export type DealRoomMilestoneRow = {
+    id: string
+    title: string
+    completed_at: string | null
+    due_date: string | null
+}
+
+export async function listDealRoomAgreements(
+    dealRoomId: string
+): Promise<DealRoomAgreementRow[] | { error: string }> {
+    const token = await getAccessToken()
+    if (!token) return { error: 'Unauthorized' }
+    const res = await apiFetchJson<DealRoomAgreementRow[] | { error: string }>({
+        path: `/deal-room/${encodeURIComponent(dealRoomId)}/agreements`,
+        method: 'GET',
+        accessToken: token,
+    })
+    if (!res.ok && res.data && typeof res.data === 'object' && 'error' in res.data) {
+        return { error: (res.data as any).error ?? 'Failed to load agreements' }
+    }
+    return Array.isArray(res.data) ? res.data : []
+}
+
+export async function listDealRoomMilestones(
+    dealRoomId: string
+): Promise<DealRoomMilestoneRow[] | { error: string }> {
+    const token = await getAccessToken()
+    if (!token) return { error: 'Unauthorized' }
+    const res = await apiFetchJson<DealRoomMilestoneRow[] | { error: string }>({
+        path: `/deal-room/${encodeURIComponent(dealRoomId)}/milestones`,
+        method: 'GET',
+        accessToken: token,
+    })
+    if (!res.ok && res.data && typeof res.data === 'object' && 'error' in res.data) {
+        return { error: (res.data as any).error ?? 'Failed to load milestones' }
+    }
+    return Array.isArray(res.data) ? res.data : []
+}
+
+export async function createDealRoomAgreement(
+    dealRoomId: string,
+    title: string
+): Promise<{ id: string } | { error: string }> {
+    const token = await getAccessToken()
+    if (!token) return { error: 'Unauthorized' }
+    const res = await apiFetchJson<{ id: string } | { error: string }>({
+        path: `/deal-room/${encodeURIComponent(dealRoomId)}/agreements`,
+        method: 'POST',
+        accessToken: token,
+        body: { title, templateKey: null, contentText: null },
+    })
+    return (res.data as any) ?? { error: 'Failed to create agreement' }
+}
+
+export async function signDealRoomAgreement(
+    dealRoomId: string,
+    agreementId: string
+): Promise<{ success: boolean } | { error: string }> {
+    const token = await getAccessToken()
+    if (!token) return { error: 'Unauthorized' }
+    const res = await apiFetchJson<{ success: boolean } | { error: string }>({
+        path: `/deal-room/${encodeURIComponent(dealRoomId)}/agreements/${encodeURIComponent(agreementId)}/sign`,
+        method: 'POST',
+        accessToken: token,
+    })
+    return (res.data as any) ?? { error: 'Failed to sign agreement' }
+}
+
+export async function linkDealRoomDataRoom(
+    dealRoomId: string,
+    startupOrgId: string
+): Promise<{ success: boolean } | { error: string }> {
+    const token = await getAccessToken()
+    if (!token) return { error: 'Unauthorized' }
+    const res = await apiFetchJson<{ success: boolean } | { error: string }>({
+        path: `/deal-room/${encodeURIComponent(dealRoomId)}/data-room-link`,
+        method: 'POST',
+        accessToken: token,
+        body: { startupOrgId },
+    })
+    return (res.data as any) ?? { error: 'Failed to link data room' }
+}
+
+export async function createDealRoomMilestone(
+    dealRoomId: string,
+    title: string
+): Promise<{ id: string } | { error: string }> {
+    const token = await getAccessToken()
+    if (!token) return { error: 'Unauthorized' }
+    const res = await apiFetchJson<{ id: string } | { error: string }>({
+        path: `/deal-room/${encodeURIComponent(dealRoomId)}/milestones`,
+        method: 'POST',
+        accessToken: token,
+        body: { title, description: null, dueDate: null },
+    })
+    return (res.data as any) ?? { error: 'Failed to create milestone' }
+}
+
+export async function completeDealRoomMilestone(
+    dealRoomId: string,
+    milestoneId: string
+): Promise<{ success: boolean } | { error: string }> {
+    const token = await getAccessToken()
+    if (!token) return { error: 'Unauthorized' }
+    const res = await apiFetchJson<{ success: boolean } | { error: string }>({
+        path: `/deal-room/${encodeURIComponent(dealRoomId)}/milestones/${encodeURIComponent(milestoneId)}`,
+        method: 'POST',
+        accessToken: token,
+        body: { completed: true },
+    })
+    return (res.data as any) ?? { error: 'Failed to update milestone' }
+}
+

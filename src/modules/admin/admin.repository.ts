@@ -89,3 +89,67 @@ export async function adminAudit(limit = 200): Promise<any[]> {
     return Array.isArray(data) ? data : []
 }
 
+export type AdminPlatformUserView = {
+    user_id: string
+    email: string | null
+    name: string | null
+    created_at: string
+    suspended: boolean
+    admin_note: string | null
+    organizations: string[]
+}
+
+export async function adminUsers(params?: { q?: string; limit?: number }): Promise<AdminPlatformUserView[]> {
+    const token = await getToken()
+    if (!token) return []
+    const q = new URLSearchParams()
+    if (params?.q) q.set('q', params.q)
+    if (typeof params?.limit === 'number') q.set('limit', String(params.limit))
+    const qs = q.toString()
+    const data = await apiRequest<AdminPlatformUserView[]>({
+        path: `/admin/users${qs ? `?${qs}` : ''}`,
+        method: 'GET',
+        accessToken: token,
+    })
+    return Array.isArray(data) ? data : []
+}
+
+export async function adminPatchUser(
+    userId: string,
+    body: { suspended?: boolean; adminNote?: string | null }
+): Promise<{ success: boolean } | { error: string }> {
+    const token = await getToken()
+    if (!token) return { error: 'Unauthorized' }
+    try {
+        const data = await apiRequest<{ success: boolean }>({
+            path: `/admin/users/${encodeURIComponent(userId)}`,
+            method: 'PATCH',
+            accessToken: token,
+            body,
+            throwOnError: true,
+        })
+        if (!data) return { error: 'Failed to update user' }
+        return data
+    } catch (e) {
+        return { error: e instanceof Error ? e.message : 'Failed to update user' }
+    }
+}
+
+export async function adminRevokeUserSessions(userId: string): Promise<{ success: boolean; deleted: number } | { error: string }> {
+    const token = await getToken()
+    if (!token) return { error: 'Unauthorized' }
+    try {
+        const data = await apiRequest<{ success: boolean; deleted: number }>({
+            path: `/admin/users/${encodeURIComponent(userId)}/revoke-sessions`,
+            method: 'POST',
+            accessToken: token,
+            body: {},
+            throwOnError: true,
+        })
+        if (!data) return { error: 'Failed to revoke sessions' }
+        return data
+    } catch (e) {
+        return { error: e instanceof Error ? e.message : 'Failed to revoke sessions' }
+    }
+}
+

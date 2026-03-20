@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ArrowLeft, Bell, Check, Loader2, UserCheck, UserX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -31,6 +32,16 @@ import { useWorkspaceTheme } from '@/app/workspace/WorkspaceThemeContext'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 
+function safeNotificationHref(link: string | null): string | null {
+    if (!link || typeof link !== 'string') return null
+    const t = link.trim()
+    if (!t) return null
+    if (t.startsWith('/auth/signout')) return null
+    if (!t.startsWith('/') || t.startsWith('//')) return null
+    if (!t.startsWith('/workspace') && !t.startsWith('/onboarding')) return null
+    return t
+}
+
 function formatRelative(dateStr: string): string {
     const d = new Date(dateStr)
     const now = Date.now()
@@ -43,6 +54,7 @@ function formatRelative(dateStr: string): string {
 }
 
 export default function WorkspaceNotificationsPage() {
+    const router = useRouter()
     const { isLight } = useWorkspaceTheme()
     const [list, setList] = useState<NotificationView[]>([])
     const [incoming, setIncoming] = useState<ConnectionRequestView[]>([])
@@ -86,9 +98,9 @@ export default function WorkspaceNotificationsPage() {
             }
             toast.success('Connection accepted', { description: 'Open Deal Room to continue.' })
             refresh()
-            window.location.href = '/workspace/connections'
+            router.push('/workspace/connections')
         }).catch(() => toast.error('Failed to accept request'))
-    }, [refresh])
+    }, [refresh, router])
 
     const handleDecline = useCallback((id: string) => {
         rejectConnectionRequest(id).then((result) => {
@@ -133,11 +145,16 @@ export default function WorkspaceNotificationsPage() {
                 toast.error(result.error || 'Failed to accept request')
                 return
             }
+            const dealRoomId = 'dealRoomId' in result ? (result as { dealRoomId: string }).dealRoomId : null
             toast.success('Deal Room opened', { description: 'You can now chat in Deal Room.' })
             refresh()
-            window.location.href = '/workspace/connections'
+            if (dealRoomId) {
+                router.push(`/workspace/deal-room/${dealRoomId}`)
+            } else {
+                router.push('/workspace/connections')
+            }
         }).catch(() => toast.error('Failed to accept request'))
-    }, [refresh])
+    }, [refresh, router])
 
     const handleRejectDealRoom = useCallback((id: string) => {
         rejectDealRoomRequest(id).then((result) => {
@@ -173,17 +190,9 @@ export default function WorkspaceNotificationsPage() {
                     <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
                     <p className={textMutedClass}>Loading…</p>
                 </div>
-            ) : list.length === 0 ? (
-                <div className={cn('rounded-2xl border p-8 text-center', panelClass)}>
-                    <Bell className="mx-auto h-10 w-10 text-slate-300 dark:text-slate-600" />
-                    <p className={cn('mt-3 font-semibold', textMainClass)}>No notifications yet</p>
-                    <p className={cn('mt-1 text-sm', textMutedClass)}>
-                        When you receive connection requests or acceptances, they’ll appear here.
-                    </p>
-                </div>
             ) : (
                 <div className="space-y-4">
-                    {(incoming.length > 0 || dataRoomIncoming.length > 0 || dealRoomIncoming.length > 0) && (
+                    {(incoming.length > 0 || dataRoomIncoming.length > 0 || dealRoomIncoming.length > 0) ? (
                         <div className={cn('rounded-2xl border p-4', panelClass)}>
                             <p className={cn('text-sm font-black uppercase tracking-widest', textMutedClass)}>
                                 Action Required
@@ -203,6 +212,7 @@ export default function WorkspaceNotificationsPage() {
                                         {req.message ? <p className={cn('mt-1 text-sm', textMutedClass)}>{req.message}</p> : null}
                                         <div className="mt-2 flex gap-2">
                                             <Button
+                                                type="button"
                                                 size="sm"
                                                 className="h-8 gap-1.5 rounded-lg bg-emerald-500 px-3 text-slate-950 hover:bg-emerald-400"
                                                 onClick={() => handleAcceptDealRoom(req.id)}
@@ -211,6 +221,7 @@ export default function WorkspaceNotificationsPage() {
                                                 Accept
                                             </Button>
                                             <Button
+                                                type="button"
                                                 size="sm"
                                                 variant="outline"
                                                 className="h-8 gap-1.5 rounded-lg px-3"
@@ -236,6 +247,7 @@ export default function WorkspaceNotificationsPage() {
                                         {req.message ? <p className={cn('mt-1 text-sm', textMutedClass)}>{req.message}</p> : null}
                                         <div className="mt-2 flex gap-2">
                                             <Button
+                                                type="button"
                                                 size="sm"
                                                 className="h-8 gap-1.5 rounded-lg bg-emerald-500 px-3 text-slate-950 hover:bg-emerald-400"
                                                 onClick={() => handleApproveDataRoom(req.id)}
@@ -244,6 +256,7 @@ export default function WorkspaceNotificationsPage() {
                                                 Approve (view)
                                             </Button>
                                             <Button
+                                                type="button"
                                                 size="sm"
                                                 variant="outline"
                                                 className="h-8 gap-1.5 rounded-lg px-3"
@@ -268,6 +281,7 @@ export default function WorkspaceNotificationsPage() {
                                         </p>
                                         <div className="mt-2 flex gap-2">
                                             <Button
+                                                type="button"
                                                 size="sm"
                                                 className="h-8 gap-1.5 rounded-lg bg-emerald-500 px-3 text-slate-950 hover:bg-emerald-400"
                                                 onClick={() => handleAccept(req.id)}
@@ -276,6 +290,7 @@ export default function WorkspaceNotificationsPage() {
                                                 Accept
                                             </Button>
                                             <Button
+                                                type="button"
                                                 size="sm"
                                                 variant="outline"
                                                 className="h-8 gap-1.5 rounded-lg px-3"
@@ -289,50 +304,64 @@ export default function WorkspaceNotificationsPage() {
                                 ))}
                             </ul>
                         </div>
-                    )}
-                    <ul className="space-y-2">
-                        {list.map((n) => (
-                            <li
-                                key={n.id}
-                                className={cn(
-                                    'rounded-xl border p-4 transition-colors',
-                                    panelClass,
-                                    !n.read_at && (isLight ? 'bg-emerald-50/50 border-emerald-200/60' : 'bg-emerald-500/5 border-emerald-500/20')
-                                )}
-                            >
-                                <div className="flex items-start justify-between gap-3">
-                                    <div className="min-w-0 flex-1">
-                                        {n.link ? (
-                                            <a
-                                                href={n.link}
-                                                className={cn('font-bold hover:underline', textMainClass)}
-                                            >
-                                                {n.title}
-                                            </a>
-                                        ) : (
-                                            <span className={cn('font-bold', textMainClass)}>{n.title}</span>
-                                        )}
-                                        {n.body && (
-                                            <p className={cn('mt-0.5 text-sm', textMutedClass)}>{n.body}</p>
-                                        )}
-                                        <p className={cn('mt-1 text-xs', textMutedClass)}>{formatRelative(n.created_at)}</p>
-                                    </div>
-                                    {!n.read_at && (
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="shrink-0 gap-1 rounded-lg"
-                                            onClick={() => handleMarkRead(n.id)}
-                                            title="Mark as read"
-                                        >
-                                            <Check className="h-3.5 w-3.5" />
-                                            Read
-                                        </Button>
+                    ) : null}
+
+                    {list.length === 0 ? (
+                        <div className={cn('rounded-2xl border p-8 text-center', panelClass)}>
+                            <Bell className="mx-auto h-10 w-10 text-slate-300 dark:text-slate-600" />
+                            <p className={cn('mt-3 font-semibold', textMainClass)}>No notifications yet</p>
+                            <p className={cn('mt-1 text-sm', textMutedClass)}>
+                                When you receive connection requests or acceptances, they’ll appear here.
+                            </p>
+                        </div>
+                    ) : (
+                        <ul className="space-y-2">
+                            {list.map((n) => (
+                                <li
+                                    key={n.id}
+                                    className={cn(
+                                        'rounded-xl border p-4 transition-colors',
+                                        panelClass,
+                                        !n.read_at && (isLight ? 'bg-emerald-50/50 border-emerald-200/60' : 'bg-emerald-500/5 border-emerald-500/20')
                                     )}
-                                </div>
-                            </li>
-                        ))}
-                    </ul>
+                                >
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0 flex-1">
+                                            {safeNotificationHref(n.link) ? (
+                                                <Link
+                                                    href={safeNotificationHref(n.link)!}
+                                                    prefetch={false}
+                                                    className={cn('font-bold hover:underline', textMainClass)}
+                                                    onClick={() => handleMarkRead(n.id)}
+                                                >
+                                                    {n.title}
+                                                </Link>
+                                            ) : (
+                                                <span className={cn('font-bold', textMainClass)}>{n.title}</span>
+                                            )}
+                                            {n.body && (
+                                                <p className={cn('mt-0.5 text-sm', textMutedClass)}>{n.body}</p>
+                                            )}
+                                            <p className={cn('mt-1 text-xs', textMutedClass)}>{formatRelative(n.created_at)}</p>
+                                        </div>
+                                        {!n.read_at && (
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                className="shrink-0 gap-1 rounded-lg"
+                                                onClick={() => handleMarkRead(n.id)}
+                                                title="Mark as read"
+                                            >
+                                                <Check className="h-3.5 w-3.5" />
+                                                Read
+                                            </Button>
+                                        )}
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
                 </div>
             )}
         </div>

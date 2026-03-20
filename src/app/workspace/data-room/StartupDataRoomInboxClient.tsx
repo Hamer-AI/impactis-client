@@ -73,10 +73,10 @@ export default function StartupDataRoomInboxClient() {
                                 </p>
                                 {r.message ? <p className={`text-sm ${textMutedClass}`}>{r.message}</p> : null}
                                 <div className="mt-3 flex gap-2">
-                                    <Button size="sm" className="rounded-lg bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => handleApprove(r.id)}>
+                                    <Button type="button" size="sm" className="rounded-lg bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => handleApprove(r.id)}>
                                         Approve (view)
                                     </Button>
-                                    <Button size="sm" variant="outline" className="rounded-lg" onClick={() => handleReject(r.id)}>
+                                    <Button type="button" size="sm" variant="outline" className="rounded-lg" onClick={() => handleReject(r.id)}>
                                         Reject
                                     </Button>
                                 </div>

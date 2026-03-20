@@ -16,6 +16,7 @@ import {
     type DataRoomContentsView,
     type DataRoomDocumentView,
 } from '@/modules/data-room/data-room.repository'
+import { isUuid } from '@/lib/uuid'
 
 function groupByFolder(docs: DataRoomDocumentView[]) {
     const by: Record<string, DataRoomDocumentView[]> = {}
@@ -56,6 +57,12 @@ export default function DataRoomAccessClient() {
             toast.error('Startup org id is required')
             return
         }
+        if (!isUuid(id)) {
+            toast.error('Invalid startup organization id', {
+                description: 'Use the UUID from the startup’s profile or discovery link (not a name or slug).',
+            })
+            return
+        }
         const res = await requestDataRoomAccess({ startupOrgId: id, message: message.trim() || null })
         if (res && typeof res === 'object' && 'error' in res) {
             toast.error(res.error)
@@ -67,10 +74,15 @@ export default function DataRoomAccessClient() {
     }, [startupOrgId, message, refresh])
 
     const loadContents = useCallback(async (orgId: string) => {
-        setSelectedStartupOrgId(orgId)
+        const trimmed = orgId.trim()
+        if (!isUuid(trimmed)) {
+            toast.error('Invalid organization id', { description: 'Cannot open this data room — id is not a valid UUID.' })
+            return
+        }
+        setSelectedStartupOrgId(trimmed)
         setContents(null)
         setContentsLoading(true)
-        const res = await getDataRoomContents({ startupOrgId: orgId })
+        const res = await getDataRoomContents({ startupOrgId: trimmed })
         setContents(res as any)
         setContentsLoading(false)
         if (res && typeof res === 'object' && 'error' in res) {
@@ -124,7 +136,7 @@ export default function DataRoomAccessClient() {
                             <Textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Intro + why you want access" />
                         </div>
                     </div>
-                    <Button onClick={handleRequest} className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700">
+                    <Button type="button" onClick={handleRequest} className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700">
                         Request access
                     </Button>
                 </CardContent>
@@ -155,6 +167,7 @@ export default function DataRoomAccessClient() {
                                         </div>
                                         <div className="flex gap-2">
                                             <Button
+                                                type="button"
                                                 size="sm"
                                                 variant="outline"
                                                 className="rounded-lg"

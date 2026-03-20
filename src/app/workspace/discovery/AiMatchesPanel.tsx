@@ -50,11 +50,11 @@ export default function AiMatchesPanel() {
                         <div>
                             <CardTitle className={textMain}>AI Matches</CardTitle>
                             <p className={`mt-1 text-sm ${textMuted}`}>
-                                Ranked suggestions based on your profile signals. (Free tier may show none.)
+                                Ranked from your org profile and onboarding signals. <strong>Free tier</strong> often returns an empty list by design — upgrade to Pro/Elite or ask an admin to confirm embedding jobs have run.
                             </p>
                         </div>
                     </div>
-                    <Button variant="outline" className="rounded-xl" onClick={refresh}>Refresh</Button>
+                    <Button type="button" variant="outline" className="rounded-xl" onClick={refresh}>Refresh</Button>
                 </CardHeader>
                 <CardContent>
                     {loading ? (
@@ -65,7 +65,9 @@ export default function AiMatchesPanel() {
                     ) : matches.length === 0 ? (
                         <div className={`rounded-2xl border p-8 text-center ${isLight ? 'border-slate-200 bg-slate-50/40' : 'border-white/10 bg-slate-950/30'}`}>
                             <p className={`font-semibold ${textMain}`}>No matches yet</p>
-                            <p className={`mt-1 text-sm ${textMuted}`}>Complete onboarding and try again, or upgrade to Pro/Elite.</p>
+                            <p className={`mt-1 text-sm ${textMuted}`}>
+                                If you are on <strong>Free</strong>, matches may be hidden until you upgrade. On paid tiers, ensure onboarding is complete and an admin has processed the AI embedding queue. See <code className="rounded bg-slate-200/50 px-1 text-xs dark:bg-slate-800">docs/AI_MATCHING.md</code> for env vars (<code className="rounded px-1 text-xs">OPENAI_API_KEY</code> optional).
+                            </p>
                         </div>
                     ) : (
                         <div className="grid gap-4 md:grid-cols-2">
@@ -86,11 +88,11 @@ export default function AiMatchesPanel() {
                                         </ul>
                                     ) : null}
                                     <div className="mt-4 flex flex-wrap gap-2">
-                                        <Button size="sm" className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-500" onClick={() => feedback(m.to_org_id, 'interested')}>
+                                        <Button type="button" size="sm" className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-500" onClick={() => feedback(m.to_org_id, 'interested')}>
                                             <ThumbsUp className="mr-2 h-4 w-4" />
                                             Interested
                                         </Button>
-                                        <Button size="sm" variant="outline" className="rounded-xl" onClick={() => feedback(m.to_org_id, 'passed')}>
+                                        <Button type="button" size="sm" variant="outline" className="rounded-xl" onClick={() => feedback(m.to_org_id, 'passed')}>
                                             <ThumbsDown className="mr-2 h-4 w-4" />
                                             Pass
                                         </Button>

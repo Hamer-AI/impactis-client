@@ -184,7 +184,13 @@ export default function WorkspaceConnectionsPage() {
                             >
                                 <span className={cn('font-medium', textMainClass)}>{c.other_org_name}</span>
                                 <Button asChild variant="ghost" size="sm" className="gap-1.5 rounded-lg">
-                                    <Link href={`/workspace/connections/${c.id}`}>
+                                    <Link
+                                        href={
+                                            c.deal_room_id
+                                                ? `/workspace/deal-room/${encodeURIComponent(c.deal_room_id)}`
+                                                : `/workspace/connections/${encodeURIComponent(c.id)}`
+                                        }
+                                    >
                                         <MessageCircle className="h-3.5 w-3.5" />
                                         Message
                                     </Link>

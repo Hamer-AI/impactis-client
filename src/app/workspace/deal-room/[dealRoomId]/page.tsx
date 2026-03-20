@@ -10,11 +10,20 @@ import { Input } from '@/components/ui/input'
 import { useWorkspaceTheme } from '@/app/workspace/WorkspaceThemeContext'
 import { cn } from '@/lib/utils'
 import {
+    completeDealRoomMilestone,
+    createDealRoomAgreement,
+    createDealRoomMilestone,
     getDealRoomDetails,
+    linkDealRoomDataRoom,
+    listDealRoomAgreements,
     listDealRoomMessages,
+    listDealRoomMilestones,
     sendDealRoomMessage,
+    signDealRoomAgreement,
     updateDealRoomStage,
+    type DealRoomAgreementRow,
     type DealRoomMessageView,
+    type DealRoomMilestoneRow,
     type DealRoomParticipantView,
     type DealRoomView,
 } from '@/modules/deal-room/deal-room.repository'
@@ -33,6 +42,12 @@ export default function DealRoomPage() {
     const [messageBody, setMessageBody] = useState('')
     const [sending, setSending] = useState(false)
     const [stageUpdating, setStageUpdating] = useState(false)
+    const [agreements, setAgreements] = useState<DealRoomAgreementRow[]>([])
+    const [milestones, setMilestones] = useState<DealRoomMilestoneRow[]>([])
+    const [agreementTitle, setAgreementTitle] = useState('')
+    const [milestoneTitle, setMilestoneTitle] = useState('')
+    const [linkStartupOrgId, setLinkStartupOrgId] = useState('')
+    const seededDataRoomLink = useRef(false)
 
     const panelClass = isLight ? 'border-slate-200 bg-white shadow-sm' : 'border-white/10 bg-slate-900/80'
     const textMainClass = isLight ? 'text-slate-900' : 'text-slate-100'
@@ -41,9 +56,11 @@ export default function DealRoomPage() {
     const refresh = useCallback(async () => {
         if (!dealRoomId) return
         setLoading(true)
-        const [details, msgs] = await Promise.all([
+        const [details, msgs, ag, ms] = await Promise.all([
             getDealRoomDetails(dealRoomId),
             listDealRoomMessages(dealRoomId),
+            listDealRoomAgreements(dealRoomId),
+            listDealRoomMilestones(dealRoomId),
         ])
         if (details && typeof details === 'object' && 'error' in details) {
             toast.error(details.error || 'Failed to load deal room')
@@ -58,6 +75,16 @@ export default function DealRoomPage() {
             setMessages([])
         } else {
             setMessages(Array.isArray(msgs) ? (msgs as any) : [])
+        }
+        if (ag && typeof ag === 'object' && 'error' in ag) {
+            setAgreements([])
+        } else {
+            setAgreements(Array.isArray(ag) ? ag : [])
+        }
+        if (ms && typeof ms === 'object' && 'error' in ms) {
+            setMilestones([])
+        } else {
+            setMilestones(Array.isArray(ms) ? ms : [])
         }
         setLoading(false)
     }, [dealRoomId])
@@ -93,6 +120,23 @@ export default function DealRoomPage() {
         refresh()
     }, [dealRoomId, refresh])
 
+    const startupOrgIdGuess = useMemo(() => {
+        const founder = participants.find((p) => p.role.toLowerCase().includes('startup'))
+        return founder?.org_id ?? ''
+    }, [participants])
+
+    useEffect(() => {
+        if (!seededDataRoomLink.current && startupOrgIdGuess) {
+            setLinkStartupOrgId(startupOrgIdGuess)
+            seededDataRoomLink.current = true
+        }
+    }, [startupOrgIdGuess])
+
+    const hasSignedAgreement = useMemo(
+        () => agreements.some((a) => a.status === 'signed' || a.status === 'executed'),
+        [agreements]
+    )
+
     if (!dealRoomId) {
         return (
             <div className="p-6">
@@ -113,7 +157,7 @@ export default function DealRoomPage() {
     if (!room) {
         return (
             <div className="p-6 max-w-3xl mx-auto space-y-4">
-                <Button variant="ghost" size="icon" asChild className="rounded-xl">
+                <Button type="button" variant="ghost" size="icon" asChild className="rounded-xl">
                     <Link href="/workspace/deal-room">
                         <ArrowLeft className="h-4 w-4" />
                     </Link>
@@ -126,7 +170,7 @@ export default function DealRoomPage() {
     return (
         <div className="p-6 max-w-5xl mx-auto space-y-6">
             <div className="flex items-center gap-3">
-                <Button variant="ghost" size="icon" asChild className="rounded-xl">
+                <Button type="button" variant="ghost" size="icon" asChild className="rounded-xl">
                     <Link href="/workspace/deal-room">
                         <ArrowLeft className="h-4 w-4" />
                     </Link>
@@ -137,6 +181,27 @@ export default function DealRoomPage() {
                         Stage: {String(room.stage).replace(/_/g, ' ')}
                     </p>
                 </div>
+            </div>
+
+            <div className={cn('rounded-2xl border p-4', panelClass)}>
+                <p className={cn('text-sm font-black uppercase tracking-widest', textMutedClass)}>Deal lifecycle (v3)</p>
+                <ul className={cn('mt-2 list-inside list-disc space-y-1 text-sm', textMainClass)}>
+                    <li>After alignment in chat, record an agreement and sign it.</li>
+                    <li>Move stage to <strong>due diligence</strong> when you begin formal DD (unlocks Data Room workflow per platform rules).</li>
+                    <li>
+                        Investors (Elite): request Data Room access from the startup — open{' '}
+                        <Link className="text-emerald-600 underline hover:text-emerald-700" href="/workspace/data-room">
+                            Data Room
+                        </Link>
+                        .
+                    </li>
+                    <li>Track checkpoints with milestones; close the deal by setting stage to closed when finished.</li>
+                </ul>
+                {hasSignedAgreement && room.stage === 'interest' ? (
+                    <p className={cn('mt-3 rounded-xl border border-emerald-200 bg-emerald-50/80 p-3 text-sm text-emerald-900 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100')}>
+                        Agreement signed — consider advancing the stage to <strong>due diligence</strong> using the panel on the right, then proceed with Data Room access if applicable.
+                    </p>
+                ) : null}
             </div>
 
             <div className="grid gap-4 md:grid-cols-3">
@@ -169,7 +234,7 @@ export default function DealRoomPage() {
                                 }
                             }}
                         />
-                        <Button onClick={handleSend} disabled={sending || messageBody.trim().length === 0} className="rounded-xl gap-2">
+                        <Button type="button" onClick={handleSend} disabled={sending || messageBody.trim().length === 0} className="rounded-xl gap-2">
                             {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                             Send
                         </Button>
@@ -195,6 +260,7 @@ export default function DealRoomPage() {
                             {STAGES.map((s) => (
                                 <Button
                                     key={s}
+                                    type="button"
                                     size="sm"
                                     variant={room.stage === s ? 'default' : 'outline'}
                                     className="rounded-lg justify-start"
@@ -205,6 +271,170 @@ export default function DealRoomPage() {
                                 </Button>
                             ))}
                         </div>
+                    </div>
+
+                    <div className={cn('rounded-2xl border p-4', panelClass)}>
+                        <p className={cn('text-sm font-black uppercase tracking-widest', textMutedClass)}>Agreements</p>
+                        <div className="mt-2 flex gap-2">
+                            <Input
+                                value={agreementTitle}
+                                onChange={(e) => setAgreementTitle(e.target.value)}
+                                placeholder="New agreement title"
+                                className="rounded-lg"
+                            />
+                            <Button
+                                type="button"
+                                size="sm"
+                                className="shrink-0 rounded-lg bg-emerald-600 text-white"
+                                onClick={async () => {
+                                    const t = agreementTitle.trim()
+                                    if (!t) return
+                                    const res = await createDealRoomAgreement(dealRoomId, t)
+                                    if (res && 'error' in res) toast.error(res.error)
+                                    else {
+                                        toast.success('Agreement created')
+                                        setAgreementTitle('')
+                                        refresh()
+                                    }
+                                }}
+                            >
+                                Add
+                            </Button>
+                        </div>
+                        <ul className="mt-3 space-y-2">
+                            {agreements.length === 0 ? (
+                                <li className={cn('text-sm', textMutedClass)}>No agreements yet.</li>
+                            ) : (
+                                agreements.map((a) => (
+                                    <li
+                                        key={a.id}
+                                        className={cn('flex flex-wrap items-center justify-between gap-2 rounded-lg border p-2 text-sm', isLight ? 'border-slate-200' : 'border-white/10')}
+                                    >
+                                        <span className={textMainClass}>
+                                            {a.title}{' '}
+                                            <span className={cn('text-xs uppercase', textMutedClass)}>({a.status})</span>
+                                        </span>
+                                        {a.status === 'draft' || a.status === 'review' ? (
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="outline"
+                                                className="rounded-md"
+                                                onClick={async () => {
+                                                    const res = await signDealRoomAgreement(dealRoomId, a.id)
+                                                    if (res && 'error' in res) toast.error(res.error)
+                                                    else {
+                                                        toast.success('Signed')
+                                                        refresh()
+                                                    }
+                                                }}
+                                            >
+                                                Sign
+                                            </Button>
+                                        ) : null}
+                                    </li>
+                                ))
+                            )}
+                        </ul>
+                    </div>
+
+                    <div className={cn('rounded-2xl border p-4', panelClass)}>
+                        <p className={cn('text-sm font-black uppercase tracking-widest', textMutedClass)}>Milestones</p>
+                        <div className="mt-2 flex gap-2">
+                            <Input
+                                value={milestoneTitle}
+                                onChange={(e) => setMilestoneTitle(e.target.value)}
+                                placeholder="Milestone title"
+                                className="rounded-lg"
+                            />
+                            <Button
+                                type="button"
+                                size="sm"
+                                className="shrink-0 rounded-lg bg-emerald-600 text-white"
+                                onClick={async () => {
+                                    const t = milestoneTitle.trim()
+                                    if (!t) return
+                                    const res = await createDealRoomMilestone(dealRoomId, t)
+                                    if (res && 'error' in res) toast.error(res.error)
+                                    else {
+                                        toast.success('Milestone added')
+                                        setMilestoneTitle('')
+                                        refresh()
+                                    }
+                                }}
+                            >
+                                Add
+                            </Button>
+                        </div>
+                        <ul className="mt-3 space-y-2">
+                            {milestones.length === 0 ? (
+                                <li className={cn('text-sm', textMutedClass)}>No milestones yet.</li>
+                            ) : (
+                                milestones.map((m) => (
+                                    <li
+                                        key={m.id}
+                                        className={cn('flex flex-wrap items-center justify-between gap-2 rounded-lg border p-2 text-sm', isLight ? 'border-slate-200' : 'border-white/10')}
+                                    >
+                                        <span className={textMainClass}>
+                                            {m.title}
+                                            {m.completed_at ? (
+                                                <span className={cn('ml-2 text-xs text-emerald-600')}>Done</span>
+                                            ) : null}
+                                        </span>
+                                        {!m.completed_at ? (
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="outline"
+                                                className="rounded-md"
+                                                onClick={async () => {
+                                                    const res = await completeDealRoomMilestone(dealRoomId, m.id)
+                                                    if (res && 'error' in res) toast.error(res.error)
+                                                    else {
+                                                        toast.success('Marked complete')
+                                                        refresh()
+                                                    }
+                                                }}
+                                            >
+                                                Complete
+                                            </Button>
+                                        ) : null}
+                                    </li>
+                                ))
+                            )}
+                        </ul>
+                    </div>
+
+                    <div className={cn('rounded-2xl border p-4', panelClass)}>
+                        <p className={cn('text-sm font-black uppercase tracking-widest', textMutedClass)}>Data room link</p>
+                        <p className={cn('mt-1 text-xs', textMutedClass)}>
+                            Associate this deal with the startup&apos;s org UUID for the Data Room workflow (MD: DD stage → access requests).
+                        </p>
+                        <Input
+                            className="mt-2 rounded-lg font-mono text-xs"
+                            value={linkStartupOrgId}
+                            onChange={(e) => setLinkStartupOrgId(e.target.value)}
+                            placeholder="Startup organization UUID"
+                        />
+                        <Button
+                            type="button"
+                            size="sm"
+                            className="mt-2 w-full rounded-lg bg-slate-800 text-white hover:bg-slate-900 dark:bg-slate-700"
+                            onClick={async () => {
+                                const id = linkStartupOrgId.trim()
+                                if (!id) {
+                                    toast.error('Startup org UUID required')
+                                    return
+                                }
+                                const res = await linkDealRoomDataRoom(dealRoomId, id)
+                                if (res && 'error' in res) toast.error(res.error)
+                                else {
+                                    toast.success('Data room linked on deal')
+                                }
+                            }}
+                        >
+                            Save link
+                        </Button>
                     </div>
                 </div>
             </div>

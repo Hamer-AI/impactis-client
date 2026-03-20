@@ -50,7 +50,7 @@ export default async function WorkspaceLayout({
             onboarding?: { blocked?: boolean; missing?: string[] }
             scores?: { overall_score?: number } | null
         }>({
-            path: '/v1/onboarding/me',
+            path: '/onboarding/me',
             method: 'GET',
             accessToken: token,
         })

@@ -3,9 +3,9 @@ import { redirect } from 'next/navigation'
 import { Pool } from 'pg'
 import { auth } from '@/lib/auth'
 import { getDashboardPathForRole, getPostAuthRedirectPath } from '@/modules/auth'
-import { getOnboardingPath } from '@/modules/onboarding'
-import { hasOrganizationMembershipForUser, mapAppRoleToOrganizationType, type OrganizationType } from '@/modules/organizations'
+import { getPrimaryOrganizationMembershipByUserId, mapAppRoleToOrganizationType, type OrganizationType } from '@/modules/organizations'
 import { OnboardingEntryClient } from '../OnboardingEntryClient'
+import CreateOrgForm from '@/app/workspace-setup/CreateOrgForm'
 
 function normalizeText(value: unknown): string {
     if (typeof value !== 'string') return ''
@@ -24,11 +24,7 @@ function normalizeTextArray(value: unknown): string[] {
 function getPool(): Pool {
     const databaseUrl = process.env.DATABASE_URL
     if (!databaseUrl) throw new Error('DATABASE_URL is not configured')
-    const pool = new Pool({ connectionString: databaseUrl })
-    pool.on('connect', (client) => {
-        client.query('SET search_path TO public')
-    })
-    return pool
+    return new Pool({ connectionString: databaseUrl })
 }
 
 async function getOnboardingDetailsFromDb(userId: string, role: string): Promise<Record<string, unknown>> {
@@ -84,13 +80,7 @@ export default async function OnboardingQuestionsPage(props: {
     const user = session.user as any
     const metadata = (user?.user_metadata ?? {}) as Record<string, unknown>
 
-    const hasMembership = await hasOrganizationMembershipForUser(null as any, user, {
-        failOpenOnRequestError: false,
-    })
-
-    if (!hasMembership) {
-        redirect('/workspace-setup')
-    }
+    const membership = await getPrimaryOrganizationMembershipByUserId(null as any, user.id)
 
     const searchParams = (props.searchParams ? await props.searchParams : {}) as { view?: string }
     const isViewMode = searchParams?.view === '1'
@@ -110,12 +100,13 @@ export default async function OnboardingQuestionsPage(props: {
         redirect(destination)
     }
 
-    const role =
+    const metadataRole =
         typeof metadata.role === 'string'
             ? metadata.role
             : typeof metadata.intended_org_type === 'string'
                 ? metadata.intended_org_type
                 : 'startup'
+    const role = membership?.organization.type ?? metadataRole
 
     const onboardingStep =
         typeof metadata.onboardingStep === 'number' ? Math.max(0, Math.trunc(metadata.onboardingStep)) : 0
@@ -132,6 +123,38 @@ export default async function OnboardingQuestionsPage(props: {
     const dbDetails = await getOnboardingDetailsFromDb(user.id, role)
     const initialValues =
         Object.keys(dbDetails).length > 0 ? { ...metadataRoleData, ...dbDetails } : metadataRoleData
+
+    if (!membership) {
+        const metadataOrgType = metadata.intended_org_type ?? metadata.role
+        const defaultOrganizationType = (mapAppRoleToOrganizationType(metadataOrgType ?? metadataRole) ?? 'startup') as OrganizationType
+        const defaultOrganizationName = normalizeText(metadata.company)
+        const defaultLocation = normalizeText(metadata.location)
+        const defaultIndustryTags = Array.from(new Set(normalizeTextArray(metadata.industry_tags)))
+
+        return (
+            <main className="min-h-screen bg-white px-4 py-10 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+                <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-2xl flex-col items-center justify-center">
+                    <section className="w-full rounded-3xl border border-slate-200 bg-white p-8 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+                        <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100">Create your organization</h1>
+                        <p className="mt-2 text-slate-600 dark:text-slate-400">
+                            Create your first organization to continue onboarding.
+                        </p>
+                        <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-800 dark:bg-emerald-950/50">
+                            <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">
+                                This is now part of the same onboarding flow, so you will not see a duplicate first page anymore.
+                            </p>
+                        </div>
+                        <CreateOrgForm
+                            defaultOrganizationType={defaultOrganizationType}
+                            defaultOrganizationName={defaultOrganizationName}
+                            defaultLocation={defaultLocation}
+                            defaultIndustryTags={defaultIndustryTags}
+                        />
+                    </section>
+                </div>
+            </main>
+        )
+    }
 
     return (
         <main className="min-h-screen bg-white px-4 py-10 text-slate-900 dark:bg-slate-950 dark:text-slate-100">

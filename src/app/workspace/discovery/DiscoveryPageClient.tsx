@@ -5,6 +5,7 @@ import DiscoveryFeedPanel from './DiscoveryFeedPanel'
 import type { UnifiedDiscoveryCard } from '@/modules/workspace/types'
 import { getBetterAuthTokenClient } from '@/lib/better-auth-token-client'
 import { apiFetchJson, formatMissingChecklist, isReadinessBlockedPayload } from '@/modules/onboarding/readiness'
+import { getOnboardingMeClient } from '@/modules/onboarding/onboarding.repository'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import AiMatchesPanel from './AiMatchesPanel'
 
@@ -24,8 +25,19 @@ export default function DiscoveryPageClient({ viewerOrgId, viewerOrgType, initia
         let cancelled = false
         async function load() {
             try {
+                const onboardingMe = await getOnboardingMeClient()
+                if (!cancelled && onboardingMe && onboardingMe.onboarding?.step1_completed !== true) {
+                    const missing = formatMissingChecklist(['onboarding.step1'])
+                    const score =
+                        typeof onboardingMe?.scores?.overall_score === 'number'
+                            ? Math.max(0, Math.min(100, Math.round(onboardingMe.scores.overall_score)))
+                            : null
+                    setBlocked({ missing, score })
+                    return
+                }
+
                 const accessToken = await getBetterAuthTokenClient()
-                if (!accessToken) return
+                if (!accessToken || cancelled) return
                 const res = await apiFetchJson<unknown[]>({
                     path: '/workspace/discovery/feed',
                     method: 'GET',

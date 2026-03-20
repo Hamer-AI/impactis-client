@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { BarChart3, Building2, CreditCard, FileText, LifeBuoy, ShieldCheck } from 'lucide-react'
+import { BarChart3, Building2, CreditCard, FileText, LifeBuoy, ShieldCheck, Users, Inbox } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -18,6 +18,10 @@ import {
     adminTickets,
     adminForceTier,
     adminUpdateOrgStatus,
+    adminUsers,
+    adminPatchUser,
+    adminRevokeUserSessions,
+    type AdminPlatformUserView,
 } from '@/modules/admin/admin.repository'
 import { cn } from '@/lib/utils'
 
@@ -35,7 +39,9 @@ export default function AdminPageClient({ isLight }: { isLight: boolean }) {
     const [dealRooms, setDealRooms] = useState<any[]>([])
     const [tickets, setTickets] = useState<any[]>([])
     const [audit, setAudit] = useState<any[]>([])
+    const [users, setUsers] = useState<AdminPlatformUserView[]>([])
     const [orgFilter, setOrgFilter] = useState('')
+    const [userSearch, setUserSearch] = useState('')
 
     const textMain = isLight ? 'text-slate-900' : 'text-slate-100'
     const textMuted = isLight ? 'text-slate-500' : 'text-slate-400'
@@ -47,6 +53,17 @@ export default function AdminPageClient({ isLight }: { isLight: boolean }) {
         return orgs.filter((o) => safeText(o.name).toLowerCase().includes(q) || safeText(o.org_id).toLowerCase().includes(q))
     }, [orgs, orgFilter])
 
+    const filteredUsers = useMemo(() => {
+        const q = userSearch.trim().toLowerCase()
+        if (!q) return users
+        return users.filter(
+            (u) =>
+                safeText(u.email).toLowerCase().includes(q) ||
+                safeText(u.name).toLowerCase().includes(q) ||
+                safeText(u.user_id).toLowerCase().includes(q)
+        )
+    }, [users, userSearch])
+
     function refreshAll() {
         setLoading(true)
         Promise.all([
@@ -56,14 +73,16 @@ export default function AdminPageClient({ isLight }: { isLight: boolean }) {
             adminDealRooms(200),
             adminTickets(200),
             adminAudit(200),
+            adminUsers({ limit: 100 }),
         ])
-            .then(([s, o, sub, dr, t, a]) => {
+            .then(([s, o, sub, dr, t, a, u]) => {
                 setStats(s)
                 setOrgs(o)
                 setSubs(sub)
                 setDealRooms(dr)
                 setTickets(t)
                 setAudit(a)
+                setUsers(u)
             })
             .catch(() => toast.error('Failed to load admin data'))
             .finally(() => setLoading(false))
@@ -100,12 +119,12 @@ export default function AdminPageClient({ isLight }: { isLight: boolean }) {
                             <h1 className={cn('text-2xl font-black tracking-tight', textMain)}>Admin</h1>
                             <p className={cn('mt-1 text-sm', textMuted)}>Platform overview, organizations, subscriptions, deal rooms, tickets, and audit logs.</p>
                         </div>
-                        <Button onClick={refreshAll} variant="outline" className="rounded-xl">
+                        <Button type="button" onClick={refreshAll} variant="outline" className="rounded-xl">
                             Refresh
                         </Button>
                     </div>
 
-                    <div className="grid gap-4 md:grid-cols-3">
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
                         <Card className={panel}>
                             <CardHeader className="flex flex-row items-center justify-between">
                                 <CardTitle className={cn('text-sm font-black uppercase tracking-widest', textMain)}>Organizations</CardTitle>
@@ -133,16 +152,119 @@ export default function AdminPageClient({ isLight }: { isLight: boolean }) {
                                 {loading ? 'Loading…' : safeText(stats?.agreements_signed_30d ?? 0)}
                             </CardContent>
                         </Card>
+                        <Card className={panel}>
+                            <CardHeader className="flex flex-row items-center justify-between">
+                                <CardTitle className={cn('text-sm font-black uppercase tracking-widest', textMain)}>Users</CardTitle>
+                                <Users className="h-4 w-4 text-emerald-500" />
+                            </CardHeader>
+                            <CardContent className={cn('text-sm', textMuted)}>
+                                {loading ? 'Loading…' : safeText(stats?.user_count ?? 0)}
+                            </CardContent>
+                        </Card>
+                        <Card className={panel}>
+                            <CardHeader className="flex flex-row items-center justify-between">
+                                <CardTitle className={cn('text-sm font-black uppercase tracking-widest', textMain)}>Open tickets</CardTitle>
+                                <Inbox className="h-4 w-4 text-emerald-500" />
+                            </CardHeader>
+                            <CardContent className={cn('text-sm', textMuted)}>
+                                {loading ? 'Loading…' : safeText(stats?.open_tickets ?? 0)}
+                            </CardContent>
+                        </Card>
                     </div>
 
                     <Tabs defaultValue="orgs">
                         <TabsList>
+                            <TabsTrigger value="users"><Users className="mr-2 h-4 w-4" />Users</TabsTrigger>
                             <TabsTrigger value="orgs"><Building2 className="mr-2 h-4 w-4" />Orgs</TabsTrigger>
                             <TabsTrigger value="subs"><CreditCard className="mr-2 h-4 w-4" />Subs</TabsTrigger>
                             <TabsTrigger value="dealrooms"><ShieldCheck className="mr-2 h-4 w-4" />Deal Rooms</TabsTrigger>
                             <TabsTrigger value="tickets"><LifeBuoy className="mr-2 h-4 w-4" />Tickets</TabsTrigger>
                             <TabsTrigger value="audit"><FileText className="mr-2 h-4 w-4" />Audit</TabsTrigger>
                         </TabsList>
+
+                        <TabsContent value="users">
+                            <Card className={panel}>
+                                <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4">
+                                    <CardTitle className={cn('text-sm font-black uppercase tracking-widest', textMain)}>Platform users</CardTitle>
+                                    <Input
+                                        value={userSearch}
+                                        onChange={(e) => setUserSearch(e.target.value)}
+                                        placeholder="Search email, name, or id…"
+                                        className="max-w-xs rounded-xl"
+                                    />
+                                </CardHeader>
+                                <CardContent>
+                                    <p className={cn('mb-4 text-xs', textMuted)}>
+                                        Suspend blocks API access (JWT). Revoke sessions clears Better Auth sessions (user must sign in again).
+                                    </p>
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>User</TableHead>
+                                                <TableHead>Organizations</TableHead>
+                                                <TableHead>Status</TableHead>
+                                                <TableHead className="text-right">Actions</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {filteredUsers.map((u) => (
+                                                <TableRow key={u.user_id}>
+                                                    <TableCell>
+                                                        <div className={cn('font-semibold', textMain)}>{safeText(u.name) || '—'}</div>
+                                                        <div className={cn('text-xs', textMuted)}>{safeText(u.email)}</div>
+                                                        <div className={cn('font-mono text-[10px]', textMuted)}>{u.user_id}</div>
+                                                        {u.admin_note ? <div className={cn('mt-1 text-xs italic', textMuted)}>Note: {u.admin_note}</div> : null}
+                                                    </TableCell>
+                                                    <TableCell className={cn('max-w-[200px] text-xs', textMuted)}>
+                                                        {u.organizations.length ? u.organizations.join(', ') : '—'}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge variant={u.suspended ? 'destructive' : 'secondary'}>
+                                                            {u.suspended ? 'Suspended' : 'Active'}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell className="text-right">
+                                                        <div className="inline-flex flex-wrap justify-end gap-2">
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                variant="outline"
+                                                                className="rounded-lg"
+                                                                onClick={async () => {
+                                                                    const res = await adminPatchUser(u.user_id, { suspended: !u.suspended })
+                                                                    if (res && 'error' in res) toast.error(res.error)
+                                                                    else {
+                                                                        toast.success(u.suspended ? 'User unsuspended' : 'User suspended')
+                                                                        refreshAll()
+                                                                    }
+                                                                }}
+                                                            >
+                                                                {u.suspended ? 'Unsuspend' : 'Suspend'}
+                                                            </Button>
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                variant="secondary"
+                                                                className="rounded-lg"
+                                                                onClick={async () => {
+                                                                    const res = await adminRevokeUserSessions(u.user_id)
+                                                                    if (res && 'error' in res) toast.error(res.error)
+                                                                    else {
+                                                                        toast.success(`Revoked ${res.deleted} session(s)`)
+                                                                    }
+                                                                }}
+                                                            >
+                                                                Revoke sessions
+                                                            </Button>
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
 
                         <TabsContent value="orgs">
                             <Card className={panel}>
@@ -177,9 +299,9 @@ export default function AdminPageClient({ isLight }: { isLight: boolean }) {
                                                     <TableCell className={textMuted}>{safeText(o.plan_code ?? 'free')}</TableCell>
                                                     <TableCell className="text-right">
                                                         <div className="inline-flex gap-2">
-                                                            <Button size="sm" variant="outline" className="rounded-lg" onClick={() => forceTier(safeText(o.org_id), 'pro')}>Set Pro</Button>
-                                                            <Button size="sm" variant="outline" className="rounded-lg" onClick={() => forceTier(safeText(o.org_id), 'elite')}>Set Elite</Button>
-                                                            <Button size="sm" variant="outline" className="rounded-lg" onClick={() => setOrgStatus(safeText(o.org_id), 'suspended')}>Suspend</Button>
+                                                            <Button type="button" size="sm" variant="outline" className="rounded-lg" onClick={() => forceTier(safeText(o.org_id), 'pro')}>Set Pro</Button>
+                                                            <Button type="button" size="sm" variant="outline" className="rounded-lg" onClick={() => forceTier(safeText(o.org_id), 'elite')}>Set Elite</Button>
+                                                            <Button type="button" size="sm" variant="outline" className="rounded-lg" onClick={() => setOrgStatus(safeText(o.org_id), 'suspended')}>Suspend</Button>
                                                         </div>
                                                     </TableCell>
                                                 </TableRow>

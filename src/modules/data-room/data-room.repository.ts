@@ -118,6 +118,21 @@ export async function approveDataRoomAccessRequest(params: {
             note: params.note ?? null,
         },
     })
+    if (!res.ok) {
+        const data = res.data as any
+        if (data && typeof data === 'object') {
+            if (typeof data.error === 'string' && data.error.trim()) {
+                return { error: data.error }
+            }
+            if (typeof data.message === 'string' && data.message.trim()) {
+                return { error: data.message }
+            }
+            if (Array.isArray(data.message) && data.message.length > 0) {
+                return { error: String(data.message[0]) }
+            }
+        }
+        return { error: 'Failed to approve request' }
+    }
     return (res.data as any) ?? { error: 'Failed to approve request' }
 }
 
@@ -133,6 +148,21 @@ export async function rejectDataRoomAccessRequest(params: {
         accessToken: token,
         body: { note: params.note ?? null },
     })
+    if (!res.ok) {
+        const data = res.data as any
+        if (data && typeof data === 'object') {
+            if (typeof data.error === 'string' && data.error.trim()) {
+                return { error: data.error }
+            }
+            if (typeof data.message === 'string' && data.message.trim()) {
+                return { error: data.message }
+            }
+            if (Array.isArray(data.message) && data.message.length > 0) {
+                return { error: String(data.message[0]) }
+            }
+        }
+        return { error: 'Failed to reject request' }
+    }
     return (res.data as any) ?? { error: 'Failed to reject request' }
 }
 

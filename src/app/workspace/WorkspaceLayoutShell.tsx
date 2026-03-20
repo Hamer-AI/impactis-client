@@ -23,6 +23,8 @@ import {
     Palette,
     MessageCircle,
     Compass,
+    UserPlus,
+    Network,
 } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
@@ -194,7 +196,10 @@ export default function WorkspaceLayoutShell({
             { href: '/workspace/discovery', label: 'Discovery', icon: Compass },
             { href: '/workspace/connections', label: 'Deal Room', icon: MessageCircle },
             { href: '/workspace/notifications', label: 'Notifications', icon: Bell },
-            { href: '/workspace/deal-room/syndicate', label: 'Syndicate', icon: MessageCircle },
+            { href: '/workspace/invite-teams', label: 'Invite Teams', icon: UserPlus },
+            ...(orgType === 'investor'
+                ? [{ href: '/workspace/syndicate', label: 'Syndicate', icon: Network }] as WorkspaceNavItem[]
+                : []),
             {
                 href: '/workspace/preferences?section=security',
                 label: 'Security',
@@ -213,7 +218,7 @@ export default function WorkspaceLayoutShell({
             { href: '/workspace/help', label: 'Help & Support', icon: LifeBuoy },
             ...(isAdmin ? [{ href: '/workspace/admin', label: 'Admin', icon: Shield }] : []),
         ],
-        [isAdmin]
+        [isAdmin, orgType]
     )
 
     const settingsSections: SettingsSectionItem[] = useMemo(() => {
@@ -537,46 +542,48 @@ export default function WorkspaceLayoutShell({
                 </div>
             </aside>
 
-            {/* Dashboard Workspace */}
-            <div className="relative flex flex-1 flex-col min-w-0 overflow-hidden pt-16 md:pt-0">
-                {header}
-                {readinessBlocked ? (
-                    <div className={cn('mx-4 mt-4 rounded-2xl border px-4 py-3 md:mx-6', panelClass)}>
-                        <div className="flex flex-col gap-1">
-                            <p className={cn('text-sm font-semibold', textMainClass)}>
-                                Complete onboarding to unlock the platform{readinessScore !== null ? ` (Score: ${readinessScore}%)` : ''}.
-                            </p>
-                            {readinessMissing.length > 0 ? (
-                                <p className={cn('text-xs', textMutedClass)}>
-                                    Missing: {readinessMissing.slice(0, 6).join(', ')}
-                                    {readinessMissing.length > 6 ? ` (+${readinessMissing.length - 6} more)` : ''}
+            {/* Dashboard Workspace: min-h-0 so inner column can shrink and scroll */}
+            <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden pt-16 md:pt-0">
+                <div className="shrink-0">{header}</div>
+                <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain">
+                    {readinessBlocked ? (
+                        <div className={cn('mx-4 mt-4 shrink-0 rounded-2xl border px-4 py-3 md:mx-6', panelClass)}>
+                            <div className="flex flex-col gap-1">
+                                <p className={cn('text-sm font-semibold', textMainClass)}>
+                                    Complete onboarding to unlock the platform{readinessScore !== null ? ` (Score: ${readinessScore}%)` : ''}.
                                 </p>
-                            ) : (
-                                <p className={cn('text-xs', textMutedClass)}>
-                                    Finish Step 1 and complete your profile (name, photo, bio) to continue.
-                                </p>
-                            )}
-                            <div className="mt-2 flex items-center gap-2">
-                                <Button
-                                    type="button"
-                                    onClick={() => router.push('/onboarding/questions')}
-                                    className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700"
-                                >
-                                    Continue onboarding
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    onClick={() => router.push('/workspace/profile')}
-                                    className={cn('rounded-xl', navIdleClass)}
-                                >
-                                    Update profile
-                                </Button>
+                                {readinessMissing.length > 0 ? (
+                                    <p className={cn('text-xs', textMutedClass)}>
+                                        Missing: {readinessMissing.slice(0, 6).join(', ')}
+                                        {readinessMissing.length > 6 ? ` (+${readinessMissing.length - 6} more)` : ''}
+                                    </p>
+                                ) : (
+                                    <p className={cn('text-xs', textMutedClass)}>
+                                        Finish Step 1 and complete your profile (name, photo, bio) to continue.
+                                    </p>
+                                )}
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                    <Button
+                                        type="button"
+                                        onClick={() => router.push('/onboarding/questions')}
+                                        className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700"
+                                    >
+                                        Continue onboarding
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        onClick={() => router.push('/workspace/profile')}
+                                        className={cn('rounded-xl', navIdleClass)}
+                                    >
+                                        Update profile
+                                    </Button>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                ) : null}
-                {children}
+                    ) : null}
+                    <div className="min-h-0 flex-1 pb-6">{children}</div>
+                </div>
             </div>
         </main>
     )

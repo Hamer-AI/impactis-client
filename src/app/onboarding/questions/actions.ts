@@ -6,6 +6,7 @@ import { auth } from '@/lib/auth'
 import { apiRequest } from '@/lib/api/rest-client'
 import { getBetterAuthToken } from '@/lib/better-auth-token'
 import { getPostAuthRedirectPath } from '@/modules/auth'
+import { getPrimaryOrganizationMembershipByUserId } from '@/modules/organizations'
 
 type QuestionnaireState = {
     error: string | null
@@ -45,7 +46,9 @@ export async function saveOnboardingQuestionnaireAction(
 
     const meta = (user.user_metadata ?? {}) as Record<string, unknown>
     try {
-        const roleRaw = (meta.role ?? meta.intended_org_type ?? null) as string | null
+        const membership = await getPrimaryOrganizationMembershipByUserId(null as any, user.id)
+        const membershipRole = membership?.organization.type ?? null
+        const roleRaw = (membershipRole ?? meta.role ?? meta.intended_org_type ?? null) as string | null
         const role =
             roleRaw === 'startup' || roleRaw === 'investor' || roleRaw === 'advisor'
                 ? roleRaw
@@ -57,7 +60,7 @@ export async function saveOnboardingQuestionnaireAction(
         }
 
         const res = await apiRequest<{ success: boolean; error?: string }>({
-            path: '/v1/onboarding/answers',
+            path: '/onboarding/answers',
             method: 'PUT',
             accessToken: token,
             body: {

@@ -31,7 +31,7 @@ export async function getOnboardingMeClient(): Promise<OnboardingMeView | null> 
     const token = await getBetterAuthTokenClient()
     if (!token) return null
     return apiRequest<OnboardingMeView>({
-        path: '/v1/onboarding/me',
+        path: '/onboarding/me',
         method: 'GET',
         accessToken: token,
     })
@@ -44,7 +44,7 @@ export async function saveOnboardingStep1Client(input: {
     const token = await getBetterAuthTokenClient()
     if (!token) return { success: false, error: 'Unauthorized' }
     return apiRequest<{ success: boolean; me?: OnboardingMeView; error?: string }>({
-        path: '/v1/onboarding/step1',
+        path: '/onboarding/step1',
         method: 'POST',
         accessToken: token,
         body: input,
@@ -59,7 +59,7 @@ export async function saveOnboardingProgressClient(input: {
     const token = await getBetterAuthTokenClient()
     if (!token) return { success: false, error: 'Unauthorized' }
     return apiRequest<{ success: boolean; me?: OnboardingMeView; error?: string }>({
-        path: '/v1/onboarding/progress',
+        path: '/onboarding/progress',
         method: 'POST',
         accessToken: token,
         body: input,
@@ -76,7 +76,7 @@ export async function upsertOnboardingAnswersClient(input: {
     const token = await getBetterAuthTokenClient()
     if (!token) return { success: false, error: 'Unauthorized' }
     return apiRequest<{ success: boolean; me?: OnboardingMeView; error?: string }>({
-        path: '/v1/onboarding/answers',
+        path: '/onboarding/answers',
         method: 'PUT',
         accessToken: token,
         body: input,
@@ -87,7 +87,7 @@ export async function getOnboardingScoreClient(): Promise<OrgScoreSnapshot | nul
     const token = await getBetterAuthTokenClient()
     if (!token) return null
     return apiRequest<OrgScoreSnapshot>({
-        path: '/v1/onboarding/score',
+        path: '/onboarding/score',
         method: 'GET',
         accessToken: token,
     })

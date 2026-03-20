@@ -95,6 +95,7 @@ export function OnboardingWizard<TValues extends Record<string, unknown>>(props:
             ...(props.initialValues as any),
         } as any,
         mode: 'onBlur',
+        shouldUnregister: false,
     })
 
     useEffect(() => {
@@ -103,6 +104,13 @@ export function OnboardingWizard<TValues extends Record<string, unknown>>(props:
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [hasInitialValues])
+
+    useEffect(() => {
+        const subscription = form.watch((value) => {
+            store.mergeValues((value ?? {}) as Record<string, unknown>)
+        })
+        return () => subscription.unsubscribe()
+    }, [form, store])
 
     const stepCount = props.steps.length
     const canBack = currentIndex > 0
@@ -120,7 +128,10 @@ export function OnboardingWizard<TValues extends Record<string, unknown>>(props:
     }
 
     const persist = async (input: { completed?: boolean; skipped?: boolean }) => {
-        const values = form.getValues()
+        const values = {
+            ...(store.values as Record<string, unknown>),
+            ...(form.getValues() as Record<string, unknown>),
+        }
         store.mergeValues(values as any)
         try {
             await save({

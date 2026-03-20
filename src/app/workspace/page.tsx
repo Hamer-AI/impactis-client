@@ -628,7 +628,7 @@ export default async function WorkspacePage(props: WorkspacePageProps) {
     const token = await getBetterAuthToken()
     const onboardingMe = token
         ? await apiRequest<{ scores?: { overall_score?: number } | null }>({
-            path: '/v1/onboarding/me',
+            path: '/onboarding/me',
             method: 'GET',
             accessToken: token,
         })
