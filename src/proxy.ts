@@ -68,7 +68,7 @@ export async function proxy(request: NextRequest) {
     let resolvedMembership = !!user
     if (shouldResolveMembership && user) {
         try {
-            resolvedMembership = await hasOrganizationMembershipForUser(null as any, user as any, {
+            resolvedMembership = await hasOrganizationMembershipForUser(user as any, {
                 throwOnRequestError: true,
             })
         } catch (error) {

@@ -25,6 +25,8 @@ import {
     Compass,
     UserPlus,
     Network,
+    Handshake,
+    FolderLock,
 } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
@@ -192,9 +194,9 @@ export default function WorkspaceLayoutShell({
                 children: [{ href: '/workspace/organization', label: 'Organization Identity', icon: Building2 }],
             },
             { href: '/workspace/subscription', label: 'Subscription & Billing', icon: Settings2 },
-            { href: '/workspace/data-room', label: 'Data Room', icon: Settings2 },
+            { href: '/workspace/data-room', label: 'Data Room', icon: FolderLock },
             { href: '/workspace/discovery', label: 'Discovery', icon: Compass },
-            { href: '/workspace/connections', label: 'Deal Room', icon: MessageCircle },
+            { href: '/workspace/deal-room', label: 'Deal Room', icon: Handshake },
             { href: '/workspace/notifications', label: 'Notifications', icon: Bell },
             { href: '/workspace/invite-teams', label: 'Invite Teams', icon: UserPlus },
             ...(orgType === 'investor'

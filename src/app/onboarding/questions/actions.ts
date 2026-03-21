@@ -46,7 +46,7 @@ export async function saveOnboardingQuestionnaireAction(
 
     const meta = (user.user_metadata ?? {}) as Record<string, unknown>
     try {
-        const membership = await getPrimaryOrganizationMembershipByUserId(null as any, user.id)
+        const membership = await getPrimaryOrganizationMembershipByUserId(user.id)
         const membershipRole = membership?.organization.type ?? null
         const roleRaw = (membershipRole ?? meta.role ?? meta.intended_org_type ?? null) as string | null
         const role =

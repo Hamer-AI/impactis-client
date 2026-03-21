@@ -647,7 +647,7 @@ export default async function WorkspacePage(props: WorkspacePageProps) {
     }
     const searchParams = props.searchParams ? await props.searchParams : undefined
     const skipCache = Boolean(searchParams?.refresh)
-    const bootstrapSnapshot = await getWorkspaceBootstrapForCurrentUser(null as any, user as any, {
+    const bootstrapSnapshot = await getWorkspaceBootstrapForCurrentUser(user as any, {
         skipCache,
         proxyOptions: { cookieHeader, appOrigin },
     })
@@ -656,14 +656,14 @@ export default async function WorkspacePage(props: WorkspacePageProps) {
     if (!membership) {
         // Use same membership check as onboarding to avoid redirect loop when bootstrap
         // fails but /organizations/me/membership/exists returns true.
-        const hasMembership = await hasOrganizationMembershipForUser(null as any, user as any, {
+        const hasMembership = await hasOrganizationMembershipForUser(user as any, {
             failOpenOnRequestError: false,
         })
         if (!hasMembership) {
             redirect(getOnboardingPath())
         }
         // Bootstrap failed but user has an org; fetch role so we can show role-specific dashboard message.
-        const primaryMembership = await getPrimaryOrganizationMembershipForUser(null as any, user as any)
+        const primaryMembership = await getPrimaryOrganizationMembershipForUser(user as any)
         const roleLabel = primaryMembership?.organization?.type
             ? toTitleCase(primaryMembership.organization.type)
             : 'workspace'
@@ -699,36 +699,39 @@ export default async function WorkspacePage(props: WorkspacePageProps) {
         bootstrapSnapshot.verification_status
     const organizationCoreTeam = bootstrapSnapshot.organization_core_team
     const currentPlan = bootstrapSnapshot.current_plan
-    const tierIdentifier = currentPlan
-        ? `${currentPlan.plan.name} - Tier ${currentPlan.plan.tier}`
+    const [billingSnapshot, billingPlansSnapshot] = await Promise.all([
+        getBillingMeForCurrentUser(),
+        getBillingPlansForCurrentUser({ segment: membership.organization.type }),
+    ])
+    const actualPlan = billingSnapshot ?? currentPlan
+
+    const tierIdentifier = actualPlan
+        ? `${actualPlan.plan.name} - Tier ${actualPlan.plan.tier}`
         : 'Tier Not Set'
-    const isFreePlan = currentPlan?.subscription.is_fallback_free || currentPlan?.plan.tier === 0
+    const isFreePlan = actualPlan?.subscription.is_fallback_free || actualPlan?.plan.tier === 0
     const startupReadiness: StartupReadiness | null =
         membership.organization.type === 'startup'
             ? (bootstrapSnapshot.startup_readiness ?? null)
             : null
     const organizationReadiness = bootstrapSnapshot.organization_readiness ?? null
-    const [billingSnapshot, billingPlansSnapshot] = await Promise.all([
-        getBillingMeForCurrentUser(null as any),
-        getBillingPlansForCurrentUser(null as any, { segment: membership.organization.type }),
-    ])
+
     const consultantRequestFeatureGate = membership.organization.type === 'startup'
         ? resolveConsultantRequestFeatureGate({
-            currentPlan: billingSnapshot ?? currentPlan,
+            currentPlan: actualPlan,
             plans: billingPlansSnapshot.plans,
             usage: billingSnapshot?.usage ?? [],
         })
         : null
     const advisorProposalFeatureGate = membership.organization.type === 'advisor'
         ? resolveAdvisorProposalFeatureGate({
-            currentPlan: billingSnapshot ?? currentPlan,
+            currentPlan: actualPlan,
             plans: billingPlansSnapshot.plans,
             usage: billingSnapshot?.usage ?? [],
         })
         : null
     const investorProfileViewFeatureGate = membership.organization.type === 'investor'
         ? resolveInvestorProfileViewFeatureGate({
-            currentPlan: billingSnapshot ?? currentPlan,
+            currentPlan: actualPlan,
             plans: billingPlansSnapshot.plans,
             usage: billingSnapshot?.usage ?? [],
         })

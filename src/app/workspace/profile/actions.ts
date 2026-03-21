@@ -143,7 +143,6 @@ function buildProfileAvatarObjectPath(userId: string, file: File): string {
 }
 
 async function removeProfileAvatarObjectIfManaged(
-    _supabase: unknown,
     publicUrl: string | null
 ): Promise<void> {
     const normalizedUrl = normalizeText(publicUrl)
@@ -180,7 +179,7 @@ export async function updateProfileAction(
         return { error: 'Your session has expired. Please log in again.', success: null }
     }
 
-    const membership = await getPrimaryOrganizationMembershipForUser(null as any, user)
+    const membership = await getPrimaryOrganizationMembershipForUser(user)
     if (!membership) {
         return { error: 'Complete onboarding before editing your profile.', success: null }
     }
@@ -339,7 +338,7 @@ export async function updateProfileAction(
         }
 
         if (avatarCurrentUrl && (avatarRemove || avatarFile)) {
-            await removeProfileAvatarObjectIfManaged(null as any, avatarCurrentUrl)
+            await removeProfileAvatarObjectIfManaged(avatarCurrentUrl)
             avatarChanged = true
         }
 

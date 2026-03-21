@@ -49,6 +49,6 @@ export async function getWorkspaceIdentityAction(): Promise<WorkspaceIdentitySna
     if (!user) {
         return null
     }
-    const snapshot = await getWorkspaceIdentityForUser(null as any, user as any)
+    const snapshot = await getWorkspaceIdentityForUser(user as any)
     return snapshot
 }

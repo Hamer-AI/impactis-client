@@ -1,4 +1,3 @@
-type SupabaseClient = unknown
 type User = {
     id: string
     email?: string | null
@@ -91,15 +90,14 @@ type WorkspaceIdentityApiResponse = {
     profile: unknown
 }
 
-async function getAccessToken(_supabase: SupabaseClient): Promise<string | null> {
+async function getAccessToken(): Promise<string | null> {
     return getBetterAuthToken()
 }
 
 export async function getProfileByUserId(
-    supabase: SupabaseClient,
     userId: string
 ): Promise<UserProfile | null> {
-    const accessToken = await getAccessToken(supabase)
+    const accessToken = await getAccessToken()
     if (!accessToken) {
         return null
     }
@@ -119,10 +117,9 @@ export async function getProfileByUserId(
 }
 
 export async function getResolvedProfileForUser(
-    supabase: SupabaseClient,
     user: User
 ): Promise<UserProfile> {
-    const profile = await getProfileByUserId(supabase, user.id)
+    const profile = await getProfileByUserId(user.id)
 
     if (!profile) {
         return getEmptyProfileFallback(user.id)
@@ -132,7 +129,6 @@ export async function getResolvedProfileForUser(
 }
 
 export async function updateProfileForUser(
-    supabase: SupabaseClient,
     user: User,
     input: {
         fullName?: string | null
@@ -158,7 +154,7 @@ export async function updateProfileForUser(
     const timezoneName = normalizeText(input.timezoneName ?? null)
     const preferredContactMethod = normalizePreferredContactMethod(input.preferredContactMethod ?? null)
 
-    const accessToken = await getAccessToken(supabase)
+    const accessToken = await getAccessToken()
     if (!accessToken) {
         throw new Error('Your session has expired. Please log in again.')
     }
@@ -184,7 +180,7 @@ export async function updateProfileForUser(
         throw new Error(result?.message ?? 'Unable to update profile right now.')
     }
 
-    const refreshed = await getProfileByUserId(supabase, user.id)
+    const refreshed = await getProfileByUserId(user.id)
     if (!refreshed) {
         return getEmptyProfileFallback(user.id)
     }

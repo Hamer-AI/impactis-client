@@ -51,7 +51,7 @@ export async function completeOnboardingAction(
         return { error: 'Your session has expired. Please log in again.' }
     }
 
-    const existingMembership = await getPrimaryOrganizationMembershipByUserId(null as any, user.id)
+    const existingMembership = await getPrimaryOrganizationMembershipByUserId(user.id)
     if (existingMembership) {
         redirect(getPostAuthRedirectPath(true, { skipCache: true }))
     }
@@ -70,7 +70,7 @@ export async function completeOnboardingAction(
     }
 
     try {
-        await createOrganizationWithOwner(null as any, {
+        await createOrganizationWithOwner({
             type,
             name,
             location,
@@ -96,7 +96,7 @@ export async function createDefaultOrganizationAndRedirect(companyNameFromDb?: s
         return { error: 'Your session has expired. Please log in again.' }
     }
 
-    const existingMembership = await getPrimaryOrganizationMembershipByUserId(null as any, user.id)
+    const existingMembership = await getPrimaryOrganizationMembershipByUserId(user.id)
     if (existingMembership) {
         redirect(getPostAuthRedirectPath(true, { skipCache: true }))
         return { error: null }
@@ -121,7 +121,7 @@ export async function createDefaultOrganizationAndRedirect(companyNameFromDb?: s
         : null
 
     try {
-        await createOrganizationWithOwner(null as any, {
+        await createOrganizationWithOwner({
             type,
             name: companyName,
             location,

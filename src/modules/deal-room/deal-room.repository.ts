@@ -23,6 +23,9 @@ export type DealRoomView = {
     stage: string
     name: string | null
     description: string | null
+    target_amount?: string | number | null
+    committed_total?: string | number | null
+    closed_at?: string | null
     created_at: string
     other_org_id: string
     other_org_name: string
@@ -252,6 +255,12 @@ export type DealRoomAgreementRow = {
     updated_at: string
 }
 
+export type DealRoomAgreementDetail = DealRoomAgreementRow & {
+    template_key: string | null
+    content_text: string | null
+    signed_by: any
+}
+
 export type DealRoomMilestoneRow = {
     id: string
     title: string
@@ -273,6 +282,23 @@ export async function listDealRoomAgreements(
         return { error: (res.data as any).error ?? 'Failed to load agreements' }
     }
     return Array.isArray(res.data) ? res.data : []
+}
+
+export async function getDealRoomAgreement(
+    dealRoomId: string,
+    agreementId: string
+): Promise<DealRoomAgreementDetail | { error: string }> {
+    const token = await getAccessToken()
+    if (!token) return { error: 'Unauthorized' }
+    const res = await apiFetchJson<DealRoomAgreementDetail | { error: string }>({
+        path: `/deal-room/${encodeURIComponent(dealRoomId)}/agreements/${encodeURIComponent(agreementId)}`,
+        method: 'GET',
+        accessToken: token,
+    })
+    if (!res.ok && res.data && typeof res.data === 'object' && 'error' in res.data) {
+        return { error: (res.data as any).error ?? 'Failed to load agreement' }
+    }
+    return (res.data as any) ?? { error: 'Failed to load agreement' }
 }
 
 export async function listDealRoomMilestones(
@@ -363,5 +389,21 @@ export async function completeDealRoomMilestone(
         body: { completed: true },
     })
     return (res.data as any) ?? { error: 'Failed to update milestone' }
+}
+
+export async function inviteDealRoomParticipant(
+    dealRoomId: string,
+    orgId: string,
+    role: string
+): Promise<{ success: boolean } | { error: string }> {
+    const token = await getAccessToken()
+    if (!token) return { error: 'Unauthorized' }
+    const res = await apiFetchJson<{ success: boolean } | { error: string }>({
+        path: `/deal-room/${encodeURIComponent(dealRoomId)}/participants/invite`,
+        method: 'POST',
+        accessToken: token,
+        body: { orgId, role },
+    })
+    return (res.data as any) ?? { error: 'Failed to invite participant' }
 }
 

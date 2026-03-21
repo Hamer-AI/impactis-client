@@ -1,4 +1,3 @@
-type SupabaseClient = unknown
 import { apiRequest } from '@/lib/api/rest-client'
 import { getBetterAuthToken } from '@/lib/better-auth-token'
 import type {
@@ -260,15 +259,14 @@ export function mapBillingCurrentPlan(value: unknown): BillingCurrentPlanSnapsho
     }
 }
 
-async function getAccessToken(_supabase: SupabaseClient): Promise<string | null> {
+async function getAccessToken(): Promise<string | null> {
     return getBetterAuthToken()
 }
 
 export async function getBillingPlansForCurrentUser(
-    supabase: SupabaseClient,
     input?: { segment?: BillingSegment | 'consultant' | null }
 ): Promise<BillingPlansSnapshot> {
-    const accessToken = await getAccessToken(supabase)
+    const accessToken = await getAccessToken()
     if (!accessToken) {
         return {
             segment: 'all',
@@ -311,9 +309,8 @@ export async function getBillingPlansForCurrentUser(
 }
 
 export async function getBillingMeForCurrentUser(
-    supabase: SupabaseClient
-): Promise<BillingMeSnapshot | null> {
-    const accessToken = await getAccessToken(supabase)
+    ): Promise<BillingMeSnapshot | null> {
+    const accessToken = await getAccessToken()
     if (!accessToken) {
         return null
     }
@@ -346,10 +343,9 @@ export async function getBillingMeForCurrentUser(
 }
 
 export async function updateBillingSubscriptionForCurrentUser(
-    supabase: SupabaseClient,
     input: UpdateBillingSubscriptionInput
 ): Promise<BillingSubscriptionMutationResult> {
-    const accessToken = await getAccessToken(supabase)
+    const accessToken = await getAccessToken()
     if (!accessToken) {
         return {
             success: false,
@@ -397,10 +393,9 @@ export async function updateBillingSubscriptionForCurrentUser(
 }
 
 export async function createStripeCheckoutSessionForCurrentUser(
-    supabase: SupabaseClient,
     input: CreateStripeCheckoutSessionInput
 ): Promise<BillingStripeRedirectResult> {
-    const accessToken = await getAccessToken(supabase)
+    const accessToken = await getAccessToken()
     if (!accessToken) {
         return {
             success: false,
@@ -461,10 +456,9 @@ export async function createStripeCheckoutSessionForCurrentUser(
 }
 
 export async function createStripePortalSessionForCurrentUser(
-    supabase: SupabaseClient,
     input?: CreateStripePortalSessionInput
 ): Promise<BillingStripeRedirectResult> {
-    const accessToken = await getAccessToken(supabase)
+    const accessToken = await getAccessToken()
     if (!accessToken) {
         return {
             success: false,

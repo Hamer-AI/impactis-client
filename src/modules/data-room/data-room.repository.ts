@@ -28,7 +28,6 @@ export type DataRoomAccessGrantView = {
 export type DataRoomFolderView = {
     id: string
     parent_id: string | null
-    path: string
     name: string
     created_at: string
 }

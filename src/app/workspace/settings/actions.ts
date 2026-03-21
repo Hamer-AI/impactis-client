@@ -342,7 +342,6 @@ function buildStartupDataRoomAssetObjectPath(
 import { saveLocalFile, deleteLocalFile, buildPublicUrlForObject } from '@/lib/storage/local-storage'
 
 async function removeOrganizationLogoObjectIfManaged(
-    _supabase: unknown,
     publicUrl: string | null
 ): Promise<void> {
     const normalizedUrl = normalizeText(publicUrl)
@@ -427,7 +426,6 @@ async function uploadStartupDataRoomAsset(input: {
 }
 
 async function removeStartupDataRoomAssetIfManaged(
-    _supabase: unknown,
     input: {
         publicUrl: string | null
         storageBucket?: string | null
@@ -485,7 +483,7 @@ async function requireOwnerSettingsContext(): Promise<{
         throw new Error('Your session has expired. Please log in again.')
     }
 
-    const membership = await getPrimaryOrganizationMembershipForUser(null as any, user)
+    const membership = await getPrimaryOrganizationMembershipForUser(user)
     if (!membership) {
         throw new Error('Complete onboarding before updating organization settings.')
     }
@@ -509,7 +507,7 @@ async function requireBillingEditorSettingsContext(): Promise<{
         throw new Error('Your session has expired. Please log in again.')
     }
 
-    const membership = await getPrimaryOrganizationMembershipForUser(null as any, user)
+    const membership = await getPrimaryOrganizationMembershipForUser(user)
     if (!membership) {
         throw new Error('Complete onboarding before updating billing settings.')
     }
@@ -690,7 +688,7 @@ export async function updateOrganizationIdentitySectionAction(
         }
 
         if (organizationLogoCurrentUrl && (organizationLogoRemove || organizationLogoFile)) {
-            await removeOrganizationLogoObjectIfManaged(null as any, organizationLogoCurrentUrl)
+            await removeOrganizationLogoObjectIfManaged(organizationLogoCurrentUrl)
         }
 
         revalidatePath('/workspace')
@@ -1039,7 +1037,7 @@ export async function deleteStartupDataRoomDocumentSectionAction(
             return { error: mutation?.message ?? 'Unable to remove data room document right now.', success: null }
         }
 
-        await removeStartupDataRoomAssetIfManaged(null as any, {
+        await removeStartupDataRoomAssetIfManaged({
             publicUrl: documentUrl,
             storageBucket: documentStorageBucket,
             storageObjectPath: documentStorageObjectPath,
@@ -1090,7 +1088,7 @@ export async function updateBillingSubscriptionSectionAction(
 
         const stripeRedirectEnabled = isStripeBillingRedirectEnabled()
         if (!stripeRedirectEnabled) {
-            const mutation = await updateBillingSubscriptionForCurrentUser(null as any, {
+            const mutation = await updateBillingSubscriptionForCurrentUser({
                 planCode,
                 billingInterval,
             })
@@ -1117,7 +1115,7 @@ export async function updateBillingSubscriptionSectionAction(
         }
 
         const baseUrl = resolveInviteBaseUrl()
-        const checkout = await createStripeCheckoutSessionForCurrentUser(null as any, {
+        const checkout = await createStripeCheckoutSessionForCurrentUser({
             planCode,
             billingInterval,
             successUrl: baseUrl
@@ -1197,7 +1195,7 @@ export async function openBillingPortalSectionAction(
         }
 
         const baseUrl = resolveInviteBaseUrl()
-        const portal = await createStripePortalSessionForCurrentUser(null as any, {
+        const portal = await createStripePortalSessionForCurrentUser({
             returnUrl: baseUrl
                 ? `${baseUrl}/workspace/settings?section=settings-billing`
                 : null,
@@ -1253,7 +1251,7 @@ export async function updateOrganizationSettingsAction(
         return { error: 'Your session has expired. Please log in again.', success: null }
     }
 
-    const membership = await getPrimaryOrganizationMembershipForUser(null as any, user)
+    const membership = await getPrimaryOrganizationMembershipForUser(user)
     if (!membership) {
         return { error: 'Complete onboarding before updating organization settings.', success: null }
     }
@@ -1351,7 +1349,7 @@ export async function updateOrganizationSettingsAction(
         }
 
         if (organizationLogoCurrentUrl && (organizationLogoRemove || organizationLogoFile)) {
-            await removeOrganizationLogoObjectIfManaged(null as any, organizationLogoCurrentUrl)
+            await removeOrganizationLogoObjectIfManaged(organizationLogoCurrentUrl)
         }
 
         if (membership.organization.type === 'startup') {
@@ -1439,7 +1437,7 @@ export async function createOrganizationInviteAction(
         }
     }
 
-    const membership = await getPrimaryOrganizationMembershipForUser(null as any, user)
+    const membership = await getPrimaryOrganizationMembershipForUser(user)
     if (!membership) {
         return {
             error: 'Complete onboarding before inviting members.',
@@ -1565,7 +1563,7 @@ export async function revokeOrganizationInviteAction(formData: FormData): Promis
         }
         telemetryContext.userId = user.id
 
-        const membership = await getPrimaryOrganizationMembershipForUser(null as any, user)
+        const membership = await getPrimaryOrganizationMembershipForUser(user)
         if (!membership) {
             throw new Error('Organization membership is required.')
         }

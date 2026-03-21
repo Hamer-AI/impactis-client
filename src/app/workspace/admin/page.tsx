@@ -10,7 +10,7 @@ export default async function AdminPage() {
     if (!session) redirect('/auth/login')
 
     const user = session.user
-    const identitySnapshot = await getWorkspaceIdentityForUser(null as any, user as any)
+    const identitySnapshot = await getWorkspaceIdentityForUser(user as any)
     if (!identitySnapshot?.membership) redirect(getOnboardingPath())
 
     const cookieStore = await cookies()

@@ -15,7 +15,7 @@ export default async function OnboardingPage() {
     }
 
     const user = session.user as any
-    const hasMembership = await hasOrganizationMembershipForUser(null as any, user, {
+    const hasMembership = await hasOrganizationMembershipForUser(user, {
         failOpenOnRequestError: false,
     })
 

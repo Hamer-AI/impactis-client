@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useWorkspaceTheme } from '@/app/workspace/WorkspaceThemeContext'
 import { cn } from '@/lib/utils'
+import { isUuid } from '@/lib/uuid'
 import {
     completeDealRoomMilestone,
     createDealRoomAgreement,
@@ -21,6 +22,7 @@ import {
     sendDealRoomMessage,
     signDealRoomAgreement,
     updateDealRoomStage,
+    inviteDealRoomParticipant,
     type DealRoomAgreementRow,
     type DealRoomMessageView,
     type DealRoomMilestoneRow,
@@ -47,6 +49,8 @@ export default function DealRoomPage() {
     const [agreementTitle, setAgreementTitle] = useState('')
     const [milestoneTitle, setMilestoneTitle] = useState('')
     const [linkStartupOrgId, setLinkStartupOrgId] = useState('')
+    const [inviteModalOpen, setInviteModalOpen] = useState(false)
+    const [inviteOrgId, setInviteOrgId] = useState('')
     const seededDataRoomLink = useRef(false)
 
     const panelClass = isLight ? 'border-slate-200 bg-white shadow-sm' : 'border-white/10 bg-slate-900/80'
@@ -168,6 +172,7 @@ export default function DealRoomPage() {
     }
 
     return (
+        <>
         <div className="p-6 max-w-5xl mx-auto space-y-6">
             <div className="flex items-center gap-3">
                 <Button type="button" variant="ghost" size="icon" asChild className="rounded-xl">
@@ -204,12 +209,14 @@ export default function DealRoomPage() {
                 ) : null}
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
-                <div className={cn('rounded-2xl border p-4 md:col-span-2', panelClass)}>
+            
+            <div className="grid gap-6 lg:grid-cols-3">
+                {/* Left Column: Chat */}
+                <div className={cn('rounded-2xl border p-4 lg:col-span-1 flex flex-col', panelClass)}>
                     <div className="flex items-center justify-between">
                         <p className={cn('text-sm font-black uppercase tracking-widest', textMutedClass)}>Discussion</p>
                     </div>
-                    <div className="mt-3 h-[420px] overflow-y-auto space-y-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3 dark:border-white/10 dark:bg-slate-950/40">
+                    <div className="mt-3 flex-1 min-h-[420px] overflow-y-auto space-y-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3 dark:border-white/10 dark:bg-slate-950/40">
                         {messages.length === 0 ? (
                             <p className={textMutedClass}>No messages yet.</p>
                         ) : (
@@ -222,7 +229,7 @@ export default function DealRoomPage() {
                             ))
                         )}
                     </div>
-                    <div className="mt-3 flex gap-2">
+                    <div className="mt-4 shrink-0 flex gap-2">
                         <Input
                             value={messageBody}
                             onChange={(e) => setMessageBody(e.target.value)}
@@ -234,211 +241,359 @@ export default function DealRoomPage() {
                                 }
                             }}
                         />
-                        <Button type="button" onClick={handleSend} disabled={sending || messageBody.trim().length === 0} className="rounded-xl gap-2">
+                        <Button type="button" onClick={handleSend} disabled={sending || messageBody.trim().length === 0} className="rounded-xl gap-2 bg-emerald-600 text-white hover:bg-emerald-700">
                             {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                            Send
                         </Button>
                     </div>
                 </div>
 
-                <div className="space-y-4">
-                    <div className={cn('rounded-2xl border p-4', panelClass)}>
-                        <p className={cn('text-sm font-black uppercase tracking-widest', textMutedClass)}>Participants</p>
-                        <ul className="mt-3 space-y-2">
-                            {participants.map((p) => (
-                                <li key={p.id} className={cn('rounded-xl border p-3', isLight ? 'border-slate-200 bg-slate-50/70' : 'border-white/10 bg-slate-950/40')}>
-                                    <p className={cn('font-bold', textMainClass)}>{p.org_name}</p>
-                                    <p className={cn('text-xs', textMutedClass)}>{p.role.replace(/_/g, ' ')}</p>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
+                {/* Right Side: 2 Columns */}
+                <div className="lg:col-span-2 flex flex-col gap-6">
+                    
+                    {/* Row 1: Deal Details & Syndicate Panel */}
+                    <div className="grid gap-6 md:grid-cols-2">
+                        {/* Deal Details */}
+                        <div className={cn('rounded-2xl border p-4 flex flex-col', panelClass, isLight ? 'bg-slate-50/50' : 'bg-slate-900/40')}>
+                            <div className="flex items-center justify-between mb-4">
+                                <p className={cn('text-sm font-black uppercase tracking-widest', textMutedClass)}>Deal Details</p>
+                            </div>
+                            <div className="space-y-4 flex-1">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <p className={cn('text-[10px] uppercase font-bold tracking-widest', textMutedClass)}>Target Investment</p>
+                                        <p className={cn('text-base font-black mt-1', textMainClass)}>
+                                            {room.target_amount ? '$' + Number(room.target_amount).toLocaleString() : 'TBD'}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className={cn('text-[10px] uppercase font-bold tracking-widest', textMutedClass)}>Committed</p>
+                                        <p className={cn('text-base font-black mt-1 text-emerald-600 dark:text-emerald-500')}>
+                                            {room.committed_total ? '$' + Number(room.committed_total).toLocaleString() : '$0'}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className={cn('text-[10px] uppercase font-bold tracking-widest', textMutedClass)}>Equity</p>
+                                        <p className={cn('text-sm font-semibold mt-1', textMainClass)}>TBD</p>
+                                    </div>
+                                    <div>
+                                        <p className={cn('text-[10px] uppercase font-bold tracking-widest', textMutedClass)}>Valuation</p>
+                                        <p className={cn('text-sm font-semibold mt-1', textMainClass)}>TBD</p>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <p className={cn('text-[10px] uppercase font-bold tracking-widest', textMutedClass)}>Timeline</p>
+                                        <p className={cn('text-sm font-semibold mt-1', textMainClass)}>{new Date(room.created_at).toLocaleDateString()} — {room.closed_at ? new Date(room.closed_at).toLocaleDateString() : 'Ongoing'}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
-                    <div className={cn('rounded-2xl border p-4', panelClass)}>
-                        <p className={cn('text-sm font-black uppercase tracking-widest', textMutedClass)}>Deal Stage</p>
-                        <div className="mt-3 grid grid-cols-2 gap-2">
-                            {STAGES.map((s) => (
-                                <Button
-                                    key={s}
-                                    type="button"
-                                    size="sm"
-                                    variant={room.stage === s ? 'default' : 'outline'}
-                                    className="rounded-lg justify-start"
-                                    disabled={stageUpdating}
-                                    onClick={() => handleStageChange(s)}
-                                >
-                                    {String(s).replace(/_/g, ' ')}
+                        {/* Syndicate Panel (Participants) */}
+                        <div className={cn('rounded-2xl border p-4 flex flex-col', panelClass)}>
+                            <p className={cn('text-sm font-black uppercase tracking-widest', textMutedClass)}>Syndicate Panel</p>
+                            <ul className="mt-4 space-y-3 flex-1 overflow-y-auto max-h-[220px]">
+                                {participants.map((p) => (
+                                    <li key={p.id} className={cn('rounded-xl border p-3 flex items-center justify-between', isLight ? 'border-slate-200 bg-slate-50/70' : 'border-white/10 bg-slate-950/40')}>
+                                        <div className="min-w-0">
+                                            <p className={cn('font-bold text-sm truncate', textMainClass)}>{p.org_name}</p>
+                                            <p className={cn('text-[10px] font-black uppercase tracking-widest mt-0.5 text-emerald-600 dark:text-emerald-500')}>{p.role.replace(/_/g, ' ')}</p>
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-white/10">
+                                <Button variant="outline" className="w-full rounded-xl text-xs font-bold shadow-sm">
+                                    + Invite Co-Investor
                                 </Button>
-                            ))}
+                            </div>
                         </div>
                     </div>
 
-                    <div className={cn('rounded-2xl border p-4', panelClass)}>
-                        <p className={cn('text-sm font-black uppercase tracking-widest', textMutedClass)}>Agreements</p>
-                        <div className="mt-2 flex gap-2">
-                            <Input
-                                value={agreementTitle}
-                                onChange={(e) => setAgreementTitle(e.target.value)}
-                                placeholder="New agreement title"
-                                className="rounded-lg"
-                            />
-                            <Button
-                                type="button"
-                                size="sm"
-                                className="shrink-0 rounded-lg bg-emerald-600 text-white"
-                                onClick={async () => {
-                                    const t = agreementTitle.trim()
-                                    if (!t) return
-                                    const res = await createDealRoomAgreement(dealRoomId, t)
-                                    if (res && 'error' in res) toast.error(res.error)
-                                    else {
-                                        toast.success('Agreement created')
-                                        setAgreementTitle('')
-                                        refresh()
-                                    }
-                                }}
-                            >
-                                Add
-                            </Button>
+                    {/* Row 2: Milestones & Agreements */}
+                    <div className="grid gap-6 md:grid-cols-2">
+                        {/* Milestones */}
+                        <div className={cn('rounded-2xl border p-4 flex flex-col', panelClass)}>
+                            <p className={cn('text-sm font-black uppercase tracking-widest', textMutedClass)}>Milestones</p>
+                            <ul className="mt-4 space-y-3 flex-1 overflow-y-auto max-h-[200px]">
+                                {milestones.length === 0 ? (
+                                    <li className={cn('text-xs', textMutedClass)}>No milestones yet.</li>
+                                ) : (
+                                    milestones.map((m) => (
+                                        <li
+                                            key={m.id}
+                                            className={cn('flex flex-wrap items-center justify-between gap-2 rounded-lg border p-2 text-sm', isLight ? 'border-slate-200 bg-white' : 'border-white/10 bg-slate-900/50')}
+                                        >
+                                            <span className={cn(textMainClass, m.completed_at ? 'line-through opacity-70' : '')}>
+                                                {m.title}
+                                            </span>
+                                            {!m.completed_at ? (
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="secondary"
+                                                    className="h-7 text-[10px] uppercase font-bold tracking-wider rounded-md bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-emerald-500/20"
+                                                    onClick={async () => {
+                                                        const res = await completeDealRoomMilestone(dealRoomId, m.id)
+                                                        if (res && 'error' in res) toast.error(res.error)
+                                                        else {
+                                                            toast.success('Marked complete')
+                                                            refresh()
+                                                        }
+                                                    }}
+                                                >
+                                                    Complete
+                                                </Button>
+                                            ) : (
+                                                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500 pr-2">Done</span>
+                                            )}
+                                        </li>
+                                    ))
+                                )}
+                            </ul>
+                            <div className="mt-4 flex gap-2">
+                                <Input
+                                    value={milestoneTitle}
+                                    onChange={(e) => setMilestoneTitle(e.target.value)}
+                                    placeholder="New milestone..."
+                                    className="rounded-lg h-9 text-xs"
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault()
+                                            const t = milestoneTitle.trim()
+                                            if (!t) return
+                                            createDealRoomMilestone(dealRoomId, t).then(res => {
+                                                if (res && 'error' in res) toast.error(res.error)
+                                                else { toast.success('Added'); setMilestoneTitle(''); refresh() }
+                                            })
+                                        }
+                                    }}
+                                />
+                                <Button
+                                    type="button"
+                                    className="h-9 shrink-0 rounded-lg bg-emerald-600 px-3 text-white text-xs font-bold shadow-sm"
+                                    onClick={async () => {
+                                        const t = milestoneTitle.trim()
+                                        if (!t) return
+                                        const res = await createDealRoomMilestone(dealRoomId, t)
+                                        if (res && 'error' in res) toast.error(res.error)
+                                        else {
+                                            toast.success('Added')
+                                            setMilestoneTitle('')
+                                            refresh()
+                                        }
+                                    }}
+                                >
+                                    Add
+                                </Button>
+                            </div>
                         </div>
-                        <ul className="mt-3 space-y-2">
-                            {agreements.length === 0 ? (
-                                <li className={cn('text-sm', textMutedClass)}>No agreements yet.</li>
-                            ) : (
-                                agreements.map((a) => (
-                                    <li
-                                        key={a.id}
-                                        className={cn('flex flex-wrap items-center justify-between gap-2 rounded-lg border p-2 text-sm', isLight ? 'border-slate-200' : 'border-white/10')}
-                                    >
-                                        <span className={textMainClass}>
-                                            {a.title}{' '}
-                                            <span className={cn('text-xs uppercase', textMutedClass)}>({a.status})</span>
-                                        </span>
-                                        {a.status === 'draft' || a.status === 'review' ? (
-                                            <Button
-                                                type="button"
-                                                size="sm"
-                                                variant="outline"
-                                                className="rounded-md"
-                                                onClick={async () => {
-                                                    const res = await signDealRoomAgreement(dealRoomId, a.id)
-                                                    if (res && 'error' in res) toast.error(res.error)
-                                                    else {
-                                                        toast.success('Signed')
-                                                        refresh()
-                                                    }
-                                                }}
-                                            >
-                                                Sign
-                                            </Button>
-                                        ) : null}
-                                    </li>
-                                ))
-                            )}
-                        </ul>
-                    </div>
 
-                    <div className={cn('rounded-2xl border p-4', panelClass)}>
-                        <p className={cn('text-sm font-black uppercase tracking-widest', textMutedClass)}>Milestones</p>
-                        <div className="mt-2 flex gap-2">
-                            <Input
-                                value={milestoneTitle}
-                                onChange={(e) => setMilestoneTitle(e.target.value)}
-                                placeholder="Milestone title"
-                                className="rounded-lg"
-                            />
-                            <Button
-                                type="button"
-                                size="sm"
-                                className="shrink-0 rounded-lg bg-emerald-600 text-white"
-                                onClick={async () => {
-                                    const t = milestoneTitle.trim()
-                                    if (!t) return
-                                    const res = await createDealRoomMilestone(dealRoomId, t)
-                                    if (res && 'error' in res) toast.error(res.error)
-                                    else {
-                                        toast.success('Milestone added')
-                                        setMilestoneTitle('')
-                                        refresh()
-                                    }
-                                }}
-                            >
-                                Add
-                            </Button>
-                        </div>
-                        <ul className="mt-3 space-y-2">
-                            {milestones.length === 0 ? (
-                                <li className={cn('text-sm', textMutedClass)}>No milestones yet.</li>
-                            ) : (
-                                milestones.map((m) => (
-                                    <li
-                                        key={m.id}
-                                        className={cn('flex flex-wrap items-center justify-between gap-2 rounded-lg border p-2 text-sm', isLight ? 'border-slate-200' : 'border-white/10')}
-                                    >
-                                        <span className={textMainClass}>
-                                            {m.title}
-                                            {m.completed_at ? (
-                                                <span className={cn('ml-2 text-xs text-emerald-600')}>Done</span>
+                        {/* Agreements */}
+                        <div className={cn('rounded-2xl border p-4 flex flex-col', panelClass)}>
+                            <p className={cn('text-sm font-black uppercase tracking-widest', textMutedClass)}>Agreements</p>
+                            <ul className="mt-4 space-y-3 flex-1 overflow-y-auto max-h-[200px]">
+                                {agreements.length === 0 ? (
+                                    <li className={cn('text-xs', textMutedClass)}>No agreements yet.</li>
+                                ) : (
+                                    agreements.map((a) => (
+                                        <li
+                                            key={a.id}
+                                            className={cn('flex flex-col gap-2 rounded-lg border p-3 text-sm', isLight ? 'border-slate-200 bg-white' : 'border-white/10 bg-slate-900/50')}
+                                        >
+                                            <div className="flex justify-between items-start">
+                                                <Link href={`/workspace/deal-room/${dealRoomId}/agreements/${a.id}`} className={cn('font-semibold hover:underline', textMainClass)}>{a.title}</Link>
+                                                <span className={cn('text-[9px] uppercase font-black px-2 py-0.5 rounded-full tracking-widest', 
+                                                    a.status === 'draft' ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400' 
+                                                  : a.status === 'review' ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400'
+                                                  : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400'
+                                                )}>
+                                                    {a.status}
+                                                </span>
+                                            </div>
+                                            {(a.status === 'draft' || a.status === 'review') ? (
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    className="mt-1 h-8 w-full rounded-md text-xs font-bold"
+                                                    onClick={async () => {
+                                                        const res = await signDealRoomAgreement(dealRoomId, a.id)
+                                                        if (res && 'error' in res) toast.error(res.error)
+                                                        else {
+                                                            toast.success('Signed')
+                                                            refresh()
+                                                        }
+                                                    }}
+                                                >
+                                                    Sign Agreement
+                                                </Button>
                                             ) : null}
-                                        </span>
-                                        {!m.completed_at ? (
-                                            <Button
-                                                type="button"
-                                                size="sm"
-                                                variant="outline"
-                                                className="rounded-md"
-                                                onClick={async () => {
-                                                    const res = await completeDealRoomMilestone(dealRoomId, m.id)
-                                                    if (res && 'error' in res) toast.error(res.error)
-                                                    else {
-                                                        toast.success('Marked complete')
-                                                        refresh()
-                                                    }
-                                                }}
-                                            >
-                                                Complete
-                                            </Button>
-                                        ) : null}
-                                    </li>
-                                ))
-                            )}
-                        </ul>
+                                        </li>
+                                    ))
+                                )}
+                            </ul>
+                            <div className="mt-4 flex gap-2">
+                                <Input
+                                    value={agreementTitle}
+                                    onChange={(e) => setAgreementTitle(e.target.value)}
+                                    placeholder="Draft agreement..."
+                                    className="rounded-lg h-9 text-xs"
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault()
+                                            const t = agreementTitle.trim()
+                                            if (!t) return
+                                            createDealRoomAgreement(dealRoomId, t).then(res => {
+                                                if (res && 'error' in res) toast.error(res.error)
+                                                else { toast.success('Added'); setAgreementTitle(''); refresh() }
+                                            })
+                                        }
+                                    }}
+                                />
+                                <Button
+                                    type="button"
+                                    className="h-9 shrink-0 rounded-lg bg-emerald-600 px-3 text-white text-xs font-bold shadow-sm"
+                                    onClick={async () => {
+                                        const t = agreementTitle.trim()
+                                        if (!t) return
+                                        const res = await createDealRoomAgreement(dealRoomId, t)
+                                        if (res && 'error' in res) toast.error(res.error)
+                                        else {
+                                            toast.success('Added')
+                                            setAgreementTitle('')
+                                            refresh()
+                                        }
+                                    }}
+                                >
+                                    Draft
+                                </Button>
+                            </div>
+                        </div>
                     </div>
 
-                    <div className={cn('rounded-2xl border p-4', panelClass)}>
-                        <p className={cn('text-sm font-black uppercase tracking-widest', textMutedClass)}>Data room link</p>
-                        <p className={cn('mt-1 text-xs', textMutedClass)}>
-                            Associate this deal with the startup&apos;s org UUID for the Data Room workflow (MD: DD stage → access requests).
-                        </p>
-                        <Input
-                            className="mt-2 rounded-lg font-mono text-xs"
-                            value={linkStartupOrgId}
-                            onChange={(e) => setLinkStartupOrgId(e.target.value)}
-                            placeholder="Startup organization UUID"
-                        />
-                        <Button
-                            type="button"
-                            size="sm"
-                            className="mt-2 w-full rounded-lg bg-slate-800 text-white hover:bg-slate-900 dark:bg-slate-700"
-                            onClick={async () => {
-                                const id = linkStartupOrgId.trim()
-                                if (!id) {
-                                    toast.error('Startup org UUID required')
-                                    return
-                                }
-                                const res = await linkDealRoomDataRoom(dealRoomId, id)
-                                if (res && 'error' in res) toast.error(res.error)
-                                else {
-                                    toast.success('Data room linked on deal')
-                                }
-                            }}
-                        >
-                            Save link
-                        </Button>
+                    {/* Row 3: Deal Stage & Data Room Link */}
+                    <div className="grid gap-6 md:grid-cols-2">
+                        {/* Data Room Link */}
+                        <div className={cn('rounded-2xl border p-5 flex flex-col justify-center', panelClass, isLight ? 'bg-gradient-to-br from-white to-slate-50' : 'bg-gradient-to-br from-slate-900 to-slate-950')}>
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="p-2 rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400">
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                                    </svg>
+                                </div>
+                                <p className={cn('text-sm font-black uppercase tracking-widest', textMainClass)}>Data Room Access</p>
+                            </div>
+                            <p className={cn('text-xs mb-4 leading-relaxed', textMutedClass)}>
+                                Elite investors can access confidential diligence folders and verified assets linked to this deal.
+                            </p>
+                            
+                            <div className="flex gap-2">
+                                <Button asChild className="w-full rounded-xl gap-2 font-bold shadow-sm bg-indigo-600 text-white hover:bg-indigo-700">
+                                    <Link href={linkStartupOrgId ? `/workspace/data-room?startupId=${linkStartupOrgId}` : '/workspace/data-room'}>
+                                        Open Data Room
+                                    </Link>
+                                </Button>
+                            </div>
+
+                            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-white/10">
+                                <p className={cn('text-[10px] font-bold uppercase tracking-widest mb-2', textMutedClass)}>Link to Startup ID</p>
+                                <div className="flex gap-2">
+                                    <Input
+                                        className="rounded-lg font-mono text-xs h-9 bg-white/50 dark:bg-black/20"
+                                        value={linkStartupOrgId}
+                                        onChange={(e) => setLinkStartupOrgId(e.target.value)}
+                                        placeholder="Startup UUID"
+                                    />
+                                    <Button
+                                        type="button"
+                                        variant="secondary"
+                                        className="h-9 px-3 rounded-lg text-xs font-bold"
+                                        onClick={async () => {
+                                            const id = linkStartupOrgId.trim()
+                                            if (!id) {
+                                                toast.error('Startup org UUID required')
+                                                return
+                                            }
+                                            if (!isUuid(id)) {
+                                                toast.error('Invalid format', { description: 'Startup org ID must be a valid UUID' })
+                                                return
+                                            }
+                                            const res = await linkDealRoomDataRoom(dealRoomId, id)
+                                            if (res && 'error' in res) toast.error(res.error)
+                                            else {
+                                                toast.success('Linked')
+                                            }
+                                        }}
+                                    >
+                                        Save
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Deal Stage Management */}
+                        <div className={cn('rounded-2xl border p-5', panelClass)}>
+                            <p className={cn('text-sm font-black uppercase tracking-widest mb-4', textMutedClass)}>Deal Stage</p>
+                            <div className="grid grid-cols-2 gap-3">
+                                {STAGES.map((s) => (
+                                    <Button
+                                        key={s}
+                                        type="button"
+                                        size="sm"
+                                        variant={room.stage === s ? 'default' : 'outline'}
+                                        className={cn(
+                                            "rounded-xl justify-start h-10 text-[11px] font-bold tracking-wide uppercase shadow-sm transition-all",
+                                            room.stage === s ? "ring-2 ring-emerald-500/20 bg-emerald-600 hover:bg-emerald-700 text-white border-0" : ""
+                                        )}
+                                        disabled={stageUpdating}
+                                        onClick={() => handleStageChange(s)}
+                                    >
+                                        {String(s).replace(/_/g, ' ')}
+                                    </Button>
+                                ))}
+                            </div>
+                        </div>
                     </div>
+
                 </div>
             </div>
         </div>
+
+            {inviteModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                    <div className={cn("w-full max-w-sm rounded-2xl p-6 shadow-xl", isLight ? "bg-white" : "bg-slate-900 border border-white/10")}>
+                        <h3 className={cn("text-lg font-black", textMainClass)}>Invite Co-Investor</h3>
+                        <p className={cn("text-xs mt-2 mb-4", textMutedClass)}>Enter the Organization UUID to invite them securely into this deal room.</p>
+                        <Input 
+                            placeholder="Organization UUID" 
+                            value={inviteOrgId} 
+                            onChange={(e) => setInviteOrgId(e.target.value)}
+                            className="mb-4 font-mono text-xs"
+                        />
+                        <div className="flex justify-end gap-2">
+                            <Button variant="ghost" onClick={() => setInviteModalOpen(false)}>Cancel</Button>
+                            <Button 
+                                onClick={async () => {
+                                    const id = inviteOrgId.trim()
+                                    if (!id || !isUuid(id)) {
+                                        toast.error('Invalid Organization UUID')
+                                        return
+                                    }
+                                    const res = await inviteDealRoomParticipant(dealRoomId, id, 'co_investor')
+                                    if (res && 'error' in res) toast.error((res as any).error)
+                                    else {
+                                        toast.success('Investor invited!')
+                                        setInviteModalOpen(false)
+                                        setInviteOrgId('')
+                                        refresh()
+                                    }
+                                }}
+                                className="bg-indigo-600 text-white hover:bg-indigo-700"
+                            >
+                                Send Invite
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </>
     )
 }
-

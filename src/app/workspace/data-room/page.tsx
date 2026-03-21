@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { getOnboardingPath } from '@/modules/onboarding'
 import { getWorkspaceIdentityForUser } from '@/modules/workspace'
+import { Suspense } from 'react'
 import { getWorkspaceSettingsSnapshotForCurrentUser } from '@/modules/workspace/workspace.repository'
 import DataRoomSection from '../settings/DataRoomSection'
 import DataRoomAccessClient from './DataRoomAccessClient'
@@ -17,7 +18,7 @@ export default async function WorkspaceDataRoomPage() {
     }
 
     const user = session.user
-    const identitySnapshot = await getWorkspaceIdentityForUser(null as any, user as any)
+    const identitySnapshot = await getWorkspaceIdentityForUser(user as any)
     const { membership } = identitySnapshot
     if (!membership) {
         redirect(getOnboardingPath())
@@ -27,7 +28,7 @@ export default async function WorkspaceDataRoomPage() {
     const themeCookie = cookieStore.get('workspace_theme')?.value
     const isLight = themeCookie !== 'dark'
 
-    const settingsSnapshot = await getWorkspaceSettingsSnapshotForCurrentUser(null as any, {
+    const settingsSnapshot = await getWorkspaceSettingsSnapshotForCurrentUser({
         section: 'settings-data-room',
         userId: user.id,
     })
@@ -67,7 +68,9 @@ export default async function WorkspaceDataRoomPage() {
                         documents={snapshotAny?.startup_data_room_documents ?? []}
                     />
                 ) : (
-                    <DataRoomAccessClient />
+                    <Suspense fallback={<div className="p-8 text-center text-slate-500">Loading access panel...</div>}>
+                        <DataRoomAccessClient />
+                    </Suspense>
                 )}
             </div>
         </main>

@@ -231,12 +231,12 @@ export default async function WorkspaceSettingsPage({
     const requestedSectionForSnapshot = requestedSection ?? 'settings-identity'
 
     const [identitySnapshot, provisionalSettingsSnapshot, bootstrapSnapshot] = await Promise.all([
-        getWorkspaceIdentityForUser(null as any, user as any),
-        getWorkspaceSettingsSnapshotForCurrentUser(null as any, {
+        getWorkspaceIdentityForUser(user as any),
+        getWorkspaceSettingsSnapshotForCurrentUser({
             section: requestedSectionForSnapshot,
             userId: user.id,
         }),
-        getWorkspaceBootstrapForCurrentUser(null as any, user as any),
+        getWorkspaceBootstrapForCurrentUser(user as any),
     ])
 
     const { profile, membership } = identitySnapshot
@@ -286,7 +286,7 @@ export default async function WorkspaceSettingsPage({
     const settingsSnapshot =
         activeSectionId === requestedSectionForSnapshot
             ? provisionalSettingsSnapshot
-            : await getWorkspaceSettingsSnapshotForCurrentUser(null as any, {
+            : await getWorkspaceSettingsSnapshotForCurrentUser({
                 section: activeSectionId,
                 userId: user.id,
             })
@@ -340,10 +340,10 @@ export default async function WorkspaceSettingsPage({
     const investorCheckSizeMinUsd = normalizeNullableInteger(investorProfile?.check_size_min_usd)
     const investorCheckSizeMaxUsd = normalizeNullableInteger(investorProfile?.check_size_max_usd)
     const billingPlansSnapshot = shouldLoadBillingPlans
-        ? await getBillingPlansForCurrentUser(null as any, { segment: membership.organization.type })
+        ? await getBillingPlansForCurrentUser({ segment: membership.organization.type })
         : null
     const billingUsageSnapshot = shouldLoadDataRoomFeatureGate
-        ? await getBillingMeForCurrentUser(null as any)
+        ? await getBillingMeForCurrentUser()
         : null
     const billingPlans: BillingPlan[] = billingPlansSnapshot?.plans ?? []
     const dataRoomDocumentsFeatureGate = shouldLoadDataRoomFeatureGate
@@ -354,7 +354,7 @@ export default async function WorkspaceSettingsPage({
         })
         : null
     const startupDataRoomDocuments: StartupDataRoomDocument[] = shouldLoadStartupDataRoomDocuments
-        ? await getStartupDataRoomDocumentsForCurrentUser(null as any)
+        ? await getStartupDataRoomDocumentsForCurrentUser()
         : []
 
     const verificationMeta = getVerificationMeta(verificationStatus)

@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -44,6 +45,16 @@ export default function DataRoomAccessClient() {
             .then(setRequests)
             .finally(() => setLoading(false))
     }, [])
+
+    const searchParams = useSearchParams()
+    const autoStartupId = searchParams.get('startupId')
+
+    useEffect(() => {
+        if (autoStartupId && isUuid(autoStartupId) && !selectedStartupOrgId && !contentsLoading) {
+            setStartupOrgId(autoStartupId)
+            loadContents(autoStartupId)
+        }
+    }, [autoStartupId, selectedStartupOrgId, contentsLoading])
 
     useEffect(() => {
         refresh()

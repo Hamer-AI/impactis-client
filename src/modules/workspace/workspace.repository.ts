@@ -1,4 +1,3 @@
-type SupabaseClient = unknown
 import { apiRequest } from '@/lib/api/rest-client'
 import { getBetterAuthToken } from '@/lib/better-auth-token'
 import type {
@@ -168,7 +167,7 @@ function setCacheEntryValue<T>(
     })
 }
 
-async function getAccessToken(_supabase: SupabaseClient): Promise<string | null> {
+async function getAccessToken(): Promise<string | null> {
     return getBetterAuthToken()
 }
 
@@ -593,9 +592,8 @@ function mapArray<T>(value: unknown, mapItem: (item: unknown) => T | null): T[] 
 }
 
 export async function getWorkspaceDashboardForCurrentUser(
-    supabase: SupabaseClient
-): Promise<WorkspaceDashboardSnapshot | null> {
-    const accessToken = await getAccessToken(supabase)
+    ): Promise<WorkspaceDashboardSnapshot | null> {
+    const accessToken = await getAccessToken()
     if (!accessToken) {
         console.warn('[workspace] Failed to load workspace dashboard snapshot: missing access token')
         return null
@@ -623,10 +621,9 @@ export async function getWorkspaceDashboardForCurrentUser(
 }
 
 export async function listWorkspaceOrganizationCoreTeamForCurrentUser(
-    supabase: SupabaseClient,
     input?: { orgId?: string | null }
 ): Promise<OrganizationMemberDirectoryEntry[]> {
-    const accessToken = await getAccessToken(supabase)
+    const accessToken = await getAccessToken()
     if (!accessToken) {
         console.warn('[workspace] Failed to load workspace core team: missing access token')
         return []
@@ -651,7 +648,6 @@ export async function listWorkspaceOrganizationCoreTeamForCurrentUser(
 }
 
 export async function getWorkspaceSettingsSnapshotForCurrentUser(
-    supabase: SupabaseClient,
     input: { section?: string | null; accessToken?: string | null; userId?: string | null }
 ): Promise<WorkspaceSettingsSnapshot | null> {
     const section = normalizeText(input.section)
@@ -664,7 +660,7 @@ export async function getWorkspaceSettingsSnapshotForCurrentUser(
         }
     }
 
-    const accessToken = input.accessToken ?? await getAccessToken(supabase)
+    const accessToken = input.accessToken ?? await getAccessToken()
     if (!accessToken) {
         console.warn('[workspace] Failed to load workspace settings snapshot: missing access token')
         return null

@@ -1,4 +1,3 @@
-type SupabaseClient = unknown
 import { apiRequest } from '@/lib/api/rest-client'
 import { getBetterAuthToken } from '@/lib/better-auth-token'
 import type {
@@ -116,7 +115,7 @@ type StartupMutationResult = {
     postId?: string | null
 }
 
-async function getAccessToken(_supabase: SupabaseClient): Promise<string | null> {
+async function getAccessToken(): Promise<string | null> {
     return getBetterAuthToken()
 }
 
@@ -381,9 +380,8 @@ function mapStartupDataRoomDocument(row: StartupDataRoomDocumentRow): StartupDat
 }
 
 export async function getStartupReadinessForCurrentUser(
-    supabase: SupabaseClient
-): Promise<StartupReadiness | null> {
-    const accessToken = await getAccessToken(supabase)
+    ): Promise<StartupReadiness | null> {
+    const accessToken = await getAccessToken()
     if (!accessToken) {
         console.warn('[startups] Failed to load startup readiness: missing access token')
         return null
@@ -402,9 +400,8 @@ export async function getStartupReadinessForCurrentUser(
 }
 
 export async function getStartupProfileForCurrentUser(
-    supabase: SupabaseClient
-): Promise<StartupProfile | null> {
-    const accessToken = await getAccessToken(supabase)
+    ): Promise<StartupProfile | null> {
+    const accessToken = await getAccessToken()
     if (!accessToken) {
         console.warn('[startups] Failed to load startup profile: missing access token')
         return null
@@ -426,7 +423,7 @@ export async function getStartupProfileForCurrentUser(
 export async function getStartupPublicDiscoveryProfile(
     startupOrgId: string
 ): Promise<StartupPublicDiscoveryProfile | null> {
-    const accessToken = await getAccessToken(null as any)
+    const accessToken = await getAccessToken()
     if (!accessToken) return null
     const path = `/startups/discovery/${encodeURIComponent(startupOrgId)}/profile`
     const row = await apiRequest<StartupPublicDiscoveryProfile | null>({
@@ -487,7 +484,6 @@ function mapPublicDoc(d: unknown): StartupPublicDiscoveryProfile['data_room_docu
 }
 
 export async function upsertStartupProfileForCurrentUser(
-    supabase: SupabaseClient,
     input: {
         websiteUrl?: string | null
         pitchDeckUrl?: string | null
@@ -511,7 +507,7 @@ export async function upsertStartupProfileForCurrentUser(
         legalDocFileSizeBytes?: number | null
     }
 ): Promise<StartupProfile> {
-    const accessToken = await getAccessToken(supabase)
+    const accessToken = await getAccessToken()
     if (!accessToken) {
         throw new Error('Your session has expired. Please log in again.')
     }
@@ -562,9 +558,8 @@ export async function upsertStartupProfileForCurrentUser(
 }
 
 export async function getStartupPostForCurrentUser(
-    supabase: SupabaseClient
-): Promise<StartupPost | null> {
-    const accessToken = await getAccessToken(supabase)
+    ): Promise<StartupPost | null> {
+    const accessToken = await getAccessToken()
     if (!accessToken) {
         console.warn('[startups] Failed to load startup post: missing access token')
         return null
@@ -583,7 +578,6 @@ export async function getStartupPostForCurrentUser(
 }
 
 export async function upsertStartupPostForCurrentUser(
-    supabase: SupabaseClient,
     input: {
         title: string
         summary: string
@@ -608,7 +602,7 @@ export async function upsertStartupPostForCurrentUser(
         throw new Error('Startup post status is invalid.')
     }
 
-    const accessToken = await getAccessToken(supabase)
+    const accessToken = await getAccessToken()
     if (!accessToken) {
         throw new Error('Your session has expired. Please log in again.')
     }
@@ -650,9 +644,8 @@ export async function upsertStartupPostForCurrentUser(
 }
 
 export async function getStartupDataRoomDocumentsForCurrentUser(
-    supabase: SupabaseClient
-): Promise<StartupDataRoomDocument[]> {
-    const accessToken = await getAccessToken(supabase)
+    ): Promise<StartupDataRoomDocument[]> {
+    const accessToken = await getAccessToken()
     if (!accessToken) {
         console.warn('[startups] Failed to load startup data room documents: missing access token')
         return []
@@ -673,7 +666,6 @@ export async function getStartupDataRoomDocumentsForCurrentUser(
 }
 
 export async function upsertStartupDataRoomDocumentForCurrentUser(
-    supabase: SupabaseClient,
     input: {
         documentType: StartupDataRoomDocumentType
         folderPath?: string | null
@@ -705,7 +697,7 @@ export async function upsertStartupDataRoomDocumentForCurrentUser(
         throw new Error('Data room file URL or storage reference is required.')
     }
 
-    const accessToken = await getAccessToken(supabase)
+    const accessToken = await getAccessToken()
     if (!accessToken) {
         throw new Error('Your session has expired. Please log in again.')
     }
@@ -733,7 +725,6 @@ export async function upsertStartupDataRoomDocumentForCurrentUser(
 }
 
 export async function deleteStartupDataRoomDocumentForCurrentUser(
-    supabase: SupabaseClient,
     documentId: string
 ): Promise<void> {
     const normalizedDocumentId = normalizeUuid(documentId)
@@ -741,7 +732,7 @@ export async function deleteStartupDataRoomDocumentForCurrentUser(
         throw new Error('Data room document id is invalid.')
     }
 
-    const accessToken = await getAccessToken(supabase)
+    const accessToken = await getAccessToken()
     if (!accessToken) {
         throw new Error('Your session has expired. Please log in again.')
     }

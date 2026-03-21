@@ -107,7 +107,7 @@ export default async function PreferencesPage({
     const accessToken = await getBetterAuthToken()
 
     const [identityResult, sessionsResult] = await Promise.all([
-        getWorkspaceIdentityForUser(null as any, user as any),
+        getWorkspaceIdentityForUser(user as any),
         accessToken
             ? apiRequest<SessionListResponse>({ path: '/sessions', accessToken })
             : Promise.resolve(null),

@@ -22,8 +22,8 @@ export default async function OrganizationPage() {
 
     const user = session.user
     const [identitySnapshot, settingsSnapshot] = await Promise.all([
-        getWorkspaceIdentityForUser(null as any, user as any),
-        getWorkspaceSettingsSnapshotForCurrentUser(null as any, {
+        getWorkspaceIdentityForUser(user as any),
+        getWorkspaceSettingsSnapshotForCurrentUser({
             section: 'settings-identity',
             userId: user.id,
         }),

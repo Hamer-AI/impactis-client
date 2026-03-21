@@ -1,4 +1,3 @@
-type SupabaseClient = unknown
 type User = {
     id: string
     email?: string | null
@@ -569,12 +568,11 @@ function mapArray<T>(value: unknown, mapItem: (item: unknown) => T | null): T[] 
         .filter((item): item is T => !!item)
 }
 
-async function getAccessToken(_supabase: SupabaseClient): Promise<string | null> {
+async function getAccessToken(): Promise<string | null> {
     return getBetterAuthToken()
 }
 
 export async function getWorkspaceIdentityForUser(
-    supabase: SupabaseClient,
     user: User,
     input?: {
         accessToken?: string | null
@@ -586,7 +584,7 @@ export async function getWorkspaceIdentityForUser(
         return cached
     }
 
-    const accessToken = input?.accessToken ?? await getAccessToken(supabase)
+    const accessToken = input?.accessToken ?? await getAccessToken()
     if (!accessToken) {
         return {
             profile: getEmptyProfileFallback(user.id),
@@ -641,7 +639,6 @@ function buildSnapshotFromBootstrapResponse(
 }
 
 export async function getWorkspaceBootstrapForCurrentUser(
-    supabase: SupabaseClient,
     user: User,
     input?: {
         accessToken?: string | null
@@ -671,7 +668,7 @@ export async function getWorkspaceBootstrapForCurrentUser(
         startup_readiness: null,
     }
 
-    const accessToken = input?.accessToken ?? await getAccessToken(supabase)
+    const accessToken = input?.accessToken ?? await getAccessToken()
     if (accessToken) {
         const data = await apiRequest<WorkspaceBootstrapApiResponse | null>({
             path: '/workspace/bootstrap',
@@ -704,7 +701,7 @@ export async function getWorkspaceBootstrapForCurrentUser(
         }
     }
 
-    const identitySnapshot = await getWorkspaceIdentityForUser(supabase, user, input?.accessToken ? { accessToken: input.accessToken } : undefined)
+    const identitySnapshot = await getWorkspaceIdentityForUser(user, input?.accessToken ? { accessToken: input.accessToken } : undefined)
     if (identitySnapshot.membership) {
         const minimalSnapshot: WorkspaceBootstrapSnapshot = {
             profile: identitySnapshot.profile,

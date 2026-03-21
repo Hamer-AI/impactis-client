@@ -1,4 +1,3 @@
-type SupabaseClient = unknown
 type User = {
     id: string
     email?: string | null
@@ -128,7 +127,7 @@ type MembershipCheckOptions = {
     throwOnRequestError?: boolean
 }
 
-async function getAccessToken(_supabase: SupabaseClient): Promise<string | null> {
+async function getAccessToken(): Promise<string | null> {
     return getBetterAuthToken()
 }
 
@@ -494,10 +493,9 @@ export function evaluateOrganizationCapability(input: {
 }
 
 export async function getPrimaryOrganizationMembershipByUserId(
-    supabase: SupabaseClient,
     userId: string
 ): Promise<OrganizationMembership | null> {
-    const accessToken = await getAccessToken(supabase)
+    const accessToken = await getAccessToken()
     if (!accessToken) {
         return null
     }
@@ -536,18 +534,16 @@ export async function getPrimaryOrganizationMembershipByUserId(
 }
 
 export async function getPrimaryOrganizationMembershipForUser(
-    supabase: SupabaseClient,
     user: User
 ): Promise<OrganizationMembership | null> {
-    return getPrimaryOrganizationMembershipByUserId(supabase, user.id)
+    return getPrimaryOrganizationMembershipByUserId(user.id)
 }
 
 export async function hasOrganizationMembershipForUser(
-    supabase: SupabaseClient,
     user: User,
     options?: MembershipCheckOptions
 ): Promise<boolean> {
-    const accessToken = await getAccessToken(supabase)
+    const accessToken = await getAccessToken()
     if (!accessToken) {
         return false
     }
@@ -577,10 +573,9 @@ export async function hasOrganizationMembershipForUser(
 }
 
 export async function getOrganizationVerificationByOrgId(
-    supabase: SupabaseClient,
     orgId: string
 ): Promise<OrganizationVerification> {
-    const accessToken = await getAccessToken(supabase)
+    const accessToken = await getAccessToken()
     if (!accessToken) {
         return getDefaultVerification(orgId)
     }
@@ -599,19 +594,17 @@ export async function getOrganizationVerificationByOrgId(
 }
 
 export async function getOrganizationVerificationStatusByOrgId(
-    supabase: SupabaseClient,
     orgId: string
 ): Promise<OrganizationVerificationStatus> {
-    const verification = await getOrganizationVerificationByOrgId(supabase, orgId)
+    const verification = await getOrganizationVerificationByOrgId(orgId)
     return verification.status
 }
 
 export async function evaluateOrganizationCapabilityForUser(
-    supabase: SupabaseClient,
     user: User,
     capability: OrganizationCapability
 ): Promise<OrganizationCapabilityGateResult> {
-    const membership = await getPrimaryOrganizationMembershipForUser(supabase, user)
+    const membership = await getPrimaryOrganizationMembershipForUser(user)
     if (!membership) {
         return evaluateOrganizationCapability({
             capability,
@@ -620,7 +613,7 @@ export async function evaluateOrganizationCapabilityForUser(
         })
     }
 
-    const verificationStatus = await getOrganizationVerificationStatusByOrgId(supabase, membership.org_id)
+    const verificationStatus = await getOrganizationVerificationStatusByOrgId(membership.org_id)
 
     return evaluateOrganizationCapability({
         capability,
@@ -630,11 +623,10 @@ export async function evaluateOrganizationCapabilityForUser(
 }
 
 export async function assertOrganizationCapabilityForUser(
-    supabase: SupabaseClient,
     user: User,
     capability: OrganizationCapability
 ): Promise<OrganizationCapabilityGateResult> {
-    const result = await evaluateOrganizationCapabilityForUser(supabase, user, capability)
+    const result = await evaluateOrganizationCapabilityForUser(user, capability)
     if (!result.allowed) {
         throw new Error(result.message)
     }
@@ -643,10 +635,9 @@ export async function assertOrganizationCapabilityForUser(
 }
 
 export async function listOrganizationsWithVerification(
-    supabase: SupabaseClient,
     limit = 100
 ): Promise<OrganizationVerificationOverview[]> {
-    const accessToken = await getAccessToken(supabase)
+    const accessToken = await getAccessToken()
     if (!accessToken) {
         throw new Error('Your session has expired. Please log in again.')
     }
@@ -691,7 +682,6 @@ export async function listOrganizationsWithVerification(
 }
 
 export async function setOrganizationVerificationStatusByOrgId(
-    supabase: SupabaseClient,
     input: {
         orgId: string
         status: OrganizationVerificationStatus
@@ -706,7 +696,7 @@ export async function setOrganizationVerificationStatusByOrgId(
 
     const status = normalizeOrganizationVerificationStatus(input.status)
     const notes = normalizeText(input.notes ?? null)
-    const accessToken = await getAccessToken(supabase)
+    const accessToken = await getAccessToken()
     if (!accessToken) {
         throw new Error('Your session has expired. Please log in again.')
     }
@@ -729,7 +719,6 @@ export async function setOrganizationVerificationStatusByOrgId(
 }
 
 export async function createOrganizationInviteForCurrentUser(
-    supabase: SupabaseClient,
     input: { invitedEmail: string; memberRole?: OrganizationMemberRole; expiresAt?: string | null }
 ): Promise<{ inviteId: string; inviteToken: string }> {
     const invitedEmail = normalizeText(input.invitedEmail)
@@ -743,7 +732,7 @@ export async function createOrganizationInviteForCurrentUser(
     }
 
     const expiresAt = normalizeText(input.expiresAt ?? null)
-    const accessToken = await getAccessToken(supabase)
+    const accessToken = await getAccessToken()
     if (!accessToken) {
         throw new Error('Your session has expired. Please log in again.')
     }
@@ -773,9 +762,8 @@ export async function createOrganizationInviteForCurrentUser(
 }
 
 export async function listMyOrganizationInvites(
-    supabase: SupabaseClient
-): Promise<OrganizationInvite[]> {
-    const accessToken = await getAccessToken(supabase)
+    ): Promise<OrganizationInvite[]> {
+    const accessToken = await getAccessToken()
     if (!accessToken) {
         console.warn('[organizations] Failed to list organization invites: missing access token')
         return []
@@ -797,7 +785,6 @@ export async function listMyOrganizationInvites(
 }
 
 export async function listOrganizationInvitesForOrg(
-    supabase: SupabaseClient,
     input: {
         orgId: string
         statuses?: OrganizationInviteStatus[]
@@ -811,7 +798,7 @@ export async function listOrganizationInvitesForOrg(
     const statuses = (input.statuses ?? [])
         .map((status) => normalizeOrganizationInviteStatus(status))
         .filter((status): status is OrganizationInviteStatus => !!status)
-    const accessToken = await getAccessToken(supabase)
+    const accessToken = await getAccessToken()
     if (!accessToken) {
         console.warn('[organizations] Failed to list organization invites: missing access token')
         return []
@@ -836,7 +823,6 @@ export async function listOrganizationInvitesForOrg(
 }
 
 export async function countOrganizationInvitesForOrg(
-    supabase: SupabaseClient,
     input: {
         orgId: string
         statuses?: OrganizationInviteStatus[]
@@ -850,7 +836,7 @@ export async function countOrganizationInvitesForOrg(
     const statuses = (input.statuses ?? [])
         .map((status) => normalizeOrganizationInviteStatus(status))
         .filter((status): status is OrganizationInviteStatus => !!status)
-    const accessToken = await getAccessToken(supabase)
+    const accessToken = await getAccessToken()
     if (!accessToken) {
         return 0
     }
@@ -874,7 +860,6 @@ export async function countOrganizationInvitesForOrg(
 }
 
 export async function listActiveOrganizationMembersForOrg(
-    supabase: SupabaseClient,
     input: { orgId: string }
 ): Promise<OrganizationMemberDirectoryEntry[]> {
     const orgId = normalizeText(input.orgId)
@@ -882,7 +867,7 @@ export async function listActiveOrganizationMembersForOrg(
         throw new Error('Organization id is required.')
     }
 
-    const accessToken = await getAccessToken(supabase)
+    const accessToken = await getAccessToken()
     if (!accessToken) {
         return []
     }
@@ -903,7 +888,6 @@ export async function listActiveOrganizationMembersForOrg(
 }
 
 export async function acceptOrganizationInviteForCurrentUser(
-    supabase: SupabaseClient,
     inviteToken: string
 ): Promise<string> {
     const normalizedInviteToken = normalizeText(inviteToken)
@@ -911,7 +895,7 @@ export async function acceptOrganizationInviteForCurrentUser(
         throw new Error('Invite token is required.')
     }
 
-    const accessToken = await getAccessToken(supabase)
+    const accessToken = await getAccessToken()
     if (!accessToken) {
         throw new Error('Your session has expired. Please log in again.')
     }
@@ -938,7 +922,6 @@ export async function acceptOrganizationInviteForCurrentUser(
 }
 
 export async function revokeOrganizationInviteForCurrentUser(
-    supabase: SupabaseClient,
     inviteId: string
 ): Promise<void> {
     const normalizedInviteId = normalizeText(inviteId)
@@ -946,7 +929,7 @@ export async function revokeOrganizationInviteForCurrentUser(
         throw new Error('Invite id is required.')
     }
 
-    const accessToken = await getAccessToken(supabase)
+    const accessToken = await getAccessToken()
     if (!accessToken) {
         throw new Error('Your session has expired. Please log in again.')
     }
@@ -963,7 +946,6 @@ export async function revokeOrganizationInviteForCurrentUser(
 }
 
 export async function createOrganizationWithOwner(
-    supabase: SupabaseClient,
     input: CreateOrganizationInput
 ): Promise<string> {
     const name = normalizeText(input.name)
@@ -979,7 +961,7 @@ export async function createOrganizationWithOwner(
     const location = normalizeText(input.location ?? null)
     const industryTags = normalizeArray(input.industryTags)
 
-    const accessToken = await getAccessToken(supabase)
+    const accessToken = await getAccessToken()
     if (!accessToken) {
         throw new Error('Your session has expired. Please log in again.')
     }
@@ -1010,7 +992,6 @@ export async function createOrganizationWithOwner(
 }
 
 export async function updateMyOrganizationSettings(
-    supabase: SupabaseClient,
     input: {
         name: string
         location?: string | null
@@ -1027,7 +1008,7 @@ export async function updateMyOrganizationSettings(
     const logoUrl = normalizeText(input.logoUrl ?? null)
     const industryTags = normalizeArray(input.industryTags)
 
-    const accessToken = await getAccessToken(supabase)
+    const accessToken = await getAccessToken()
     if (!accessToken) {
         throw new Error('Your session has expired. Please log in again.')
     }

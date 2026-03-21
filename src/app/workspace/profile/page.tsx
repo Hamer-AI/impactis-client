@@ -135,7 +135,7 @@ export default async function WorkspaceProfilePage() {
     }
 
     const user = session.user
-    const { profile, membership, onboarding_progress, onboarding_details } = await getWorkspaceIdentityForUser(null as any, user as any)
+    const { profile, membership, onboarding_progress, onboarding_details } = await getWorkspaceIdentityForUser(user as any)
 
     if (!membership) {
         redirect(getOnboardingPath())

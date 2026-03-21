@@ -45,16 +45,16 @@ export default async function SubscriptionPage({
     if (!session) redirect('/auth/login')
 
     const user = session.user
-    const identitySnapshot = await getWorkspaceIdentityForUser(null as any, user as any)
+    const identitySnapshot = await getWorkspaceIdentityForUser(user as any)
     const { membership } = identitySnapshot
     if (!membership) redirect(getOnboardingPath())
 
     const [settingsSnapshot, billingPlansSnapshot] = await Promise.all([
-        getWorkspaceSettingsSnapshotForCurrentUser(null as any, {
+        getWorkspaceSettingsSnapshotForCurrentUser({
             section: 'settings-billing',
             userId: user.id,
         }),
-        getBillingPlansForCurrentUser(null as any, { segment: membership.organization.type }),
+        getBillingPlansForCurrentUser({ segment: membership.organization.type }),
     ])
 
     const cookieStore = await cookies()

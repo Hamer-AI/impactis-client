@@ -20,7 +20,9 @@ import { useWorkspaceTheme } from '@/app/workspace/WorkspaceThemeContext'
 import { cn } from '@/lib/utils'
 import { isUuid } from '@/lib/uuid'
 
-export default function SyndicateManagementClient() {
+export type OrganizationOption = { id: string; name: string; type: 'startup' | 'investor' | 'advisor' }
+
+export default function SyndicateManagementClient({ organizations = [] }: { organizations?: OrganizationOption[] }) {
     const { isLight } = useWorkspaceTheme()
     const [list, setList] = useState<SyndicateView[]>([])
     const [loading, setLoading] = useState(true)
@@ -134,8 +136,20 @@ export default function SyndicateManagementClient() {
                             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Syndicate name" />
                         </div>
                         <div className="space-y-1.5">
-                            <div className={cn('text-xs font-black uppercase tracking-widest', textMutedClass)}>Startup org UUID (optional)</div>
-                            <Input value={startupOrgId} onChange={(e) => setStartupOrgId(e.target.value)} placeholder="uuid" />
+                            <div className={cn('text-xs font-black uppercase tracking-widest', textMutedClass)}>Startup Target (optional)</div>
+                            <select
+                                className={cn(
+                                    "flex h-10 w-full rounded-md border px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+                                    isLight ? "border-slate-200 bg-white placeholder:text-slate-500" : "border-slate-800 bg-slate-950 ring-offset-slate-950 placeholder:text-slate-400 focus-visible:ring-slate-300"
+                                )}
+                                value={startupOrgId}
+                                onChange={(e) => setStartupOrgId(e.target.value)}
+                            >
+                                <option value="">-- Select Startup --</option>
+                                {organizations.map(o => (
+                                    <option key={o.id} value={o.id}>{o.name} ({o.type})</option>
+                                ))}
+                            </select>
                         </div>
                     </div>
                     <div className="space-y-1.5">
@@ -237,12 +251,19 @@ export default function SyndicateManagementClient() {
                                                     <div className="space-y-2">
                                                         <p className={cn('text-xs font-black uppercase tracking-widest', textMutedClass)}>Invite organization</p>
                                                         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                                                            <Input
-                                                                className="sm:max-w-xs"
-                                                                placeholder="Invitee org UUID"
+                                                            <select
+                                                                className={cn(
+                                                                    "flex h-10 w-full sm:max-w-xs rounded-md border px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+                                                                    isLight ? "border-slate-200 bg-white placeholder:text-slate-500" : "border-slate-800 bg-slate-950 ring-offset-slate-950 placeholder:text-slate-400 focus-visible:ring-slate-300"
+                                                                )}
                                                                 value={inviteeOrgId}
                                                                 onChange={(e) => setInviteeOrgId(e.target.value)}
-                                                            />
+                                                            >
+                                                                <option value="">-- Select Organization --</option>
+                                                                {organizations.map(o => (
+                                                                    <option key={o.id} value={o.id}>{o.name} ({o.type})</option>
+                                                                ))}
+                                                            </select>
                                                             <Input
                                                                 className="flex-1"
                                                                 placeholder="Message (optional)"

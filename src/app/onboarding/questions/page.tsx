@@ -80,7 +80,7 @@ export default async function OnboardingQuestionsPage(props: {
     const user = session.user as any
     const metadata = (user?.user_metadata ?? {}) as Record<string, unknown>
 
-    const membership = await getPrimaryOrganizationMembershipByUserId(null as any, user.id)
+    const membership = await getPrimaryOrganizationMembershipByUserId(user.id)
 
     const searchParams = (props.searchParams ? await props.searchParams : {}) as { view?: string }
     const isViewMode = searchParams?.view === '1'

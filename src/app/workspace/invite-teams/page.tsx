@@ -11,8 +11,8 @@ export default async function InviteTeamsPage() {
 
     const user = session.user
     const [identitySnapshot, settingsSnapshot] = await Promise.all([
-        getWorkspaceIdentityForUser(null as any, user as any),
-        getWorkspaceSettingsSnapshotForCurrentUser(null as any, {
+        getWorkspaceIdentityForUser(user as any),
+        getWorkspaceSettingsSnapshotForCurrentUser({
             section: 'settings-invites',
             userId: user.id,
         }),

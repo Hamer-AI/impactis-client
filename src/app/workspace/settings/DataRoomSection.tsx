@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useActionState, useEffect } from 'react'
 import { toast } from 'sonner'
-import { ArrowUpRight, FolderLock, UploadCloud } from 'lucide-react'
+import { ArrowUpRight, FolderLock, UploadCloud, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -348,99 +348,84 @@ export default function DataRoomSection(input: DataRoomSectionProps) {
                 </div>
                 <div className="md:col-span-2">
                     {input.documents.length > 0 ? (
-                        <div className="flex flex-col gap-3 max-w-2xl">
+                        <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 w-full">
                             {input.documents.map((document) => (
                                 <div
                                     key={document.id}
-                                    className={`group flex items-stretch justify-between gap-3 rounded-2xl border px-4 py-3 transition-all hover:-translate-y-0.5 hover:shadow-md ${input.mutedPanelClass}`}
+                                    className={`group relative flex flex-col justify-between gap-3 rounded-2xl border p-4 transition-all hover:-translate-y-1 hover:shadow-lg ${input.mutedPanelClass}`}
                                 >
-                                    <div className="flex flex-1 items-start gap-3 overflow-hidden">
-                                        <div
-                                            className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border text-emerald-500 ${input.isLight ? 'border-slate-200 bg-white' : 'border-slate-700 bg-slate-950'}`}
-                                        >
-                                            <FolderLock className="h-4 w-4" />
-                                        </div>
-                                        <div className="min-w-0 space-y-1">
-                                            <div className="flex items-center justify-between gap-2">
-                                                <p
-                                                    className={`truncate text-[13px] font-semibold ${input.textMainClass}`}
-                                                    title={document.title}
-                                                >
-                                                    {document.title || getDocumentTypeLabel(document.document_type)}
-                                                </p>
-                                                <Badge
-                                                    variant="outline"
-                                                    className="shrink-0 rounded-full border-slate-200 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-slate-500"
-                                                >
-                                                    {getDocumentTypeLabel(document.document_type)}
-                                                </Badge>
+                                    <div className="space-y-3">
+                                        <div className="flex items-start justify-between">
+                                            <div
+                                                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border text-emerald-500 shadow-sm ${input.isLight ? 'border-slate-200 bg-white' : 'border-slate-700 bg-slate-950'}`}
+                                            >
+                                                <FolderLock className="h-5 w-5" />
                                             </div>
-                                            <div className="flex flex-wrap items-center gap-2 text-[11px]">
-                                                {document.folder_path ? (
-                                                    <>
-                                                        <Badge
-                                                            variant="secondary"
-                                                            className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-widest"
-                                                        >
-                                                            {document.folder_path}
-                                                        </Badge>
-                                                        <span className="text-slate-400">•</span>
-                                                    </>
-                                                ) : null}
-                                                <a
-                                                    href={document.file_url}
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                    className="max-w-[220px] truncate font-semibold text-emerald-500 hover:underline"
-                                                >
-                                                    {document.file_name || 'Open document'}
-                                                </a>
-                                                <span className="text-slate-400">•</span>
-                                                <span className={input.textMutedClass}>
-                                                    {formatFileSize(document.file_size_bytes)}
-                                                    {document.content_type
-                                                        ? ` · ${document.content_type.split('/').pop()?.toUpperCase()}`
-                                                        : ''}
-                                                </span>
-                                                <span className="text-slate-400">•</span>
-                                                <span className="text-[10px] font-medium text-slate-400">
-                                                    Updated {new Date(document.updated_at).toLocaleDateString()}
-                                                </span>
-                                            </div>
-                                            {document.summary ? (
-                                                <p
-                                                    className={`line-clamp-2 text-[11px] font-medium leading-relaxed ${input.textMutedClass}`}
-                                                >
-                                                    {document.summary}
-                                                </p>
+                                            {input.canEdit ? (
+                                                <form action={deleteAction} className="shrink-0 z-10 relative">
+                                                    <input type="hidden" name="dataRoomDocumentId" value={document.id} />
+                                                    <input type="hidden" name="dataRoomDocumentUrl" value={document.file_url} />
+                                                    <input type="hidden" name="dataRoomDocumentStorageBucket" value={document.storage_bucket ?? ''} />
+                                                    <input type="hidden" name="dataRoomDocumentStorageObjectPath" value={document.storage_object_path ?? ''} />
+                                                    <Button
+                                                        type="submit"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        disabled={isDeletePending}
+                                                        title="Remove document"
+                                                        className="h-8 w-8 text-rose-500 hover:bg-rose-50 hover:text-rose-600 rounded-lg -mr-1 -mt-1"
+                                                    >
+                                                        {isDeletePending ? <span className="text-[10px]">...</span> : <Trash2 className="h-4 w-4" />}
+                                                    </Button>
+                                                </form>
                                             ) : null}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p
+                                                className={`line-clamp-2 text-[13px] font-bold leading-snug ${input.textMainClass}`}
+                                                title={document.title}
+                                            >
+                                                {document.title || getDocumentTypeLabel(document.document_type)}
+                                            </p>
+                                            <Badge
+                                                variant="outline"
+                                                className="mt-2 border-slate-200 px-2 text-[9px] font-black uppercase tracking-widest text-slate-500"
+                                            >
+                                                {getDocumentTypeLabel(document.document_type)}
+                                            </Badge>
                                         </div>
                                     </div>
 
-                                    {input.canEdit ? (
-                                        <form action={deleteAction} className="flex items-center shrink-0">
-                                            <input type="hidden" name="dataRoomDocumentId" value={document.id} />
-                                            <input type="hidden" name="dataRoomDocumentUrl" value={document.file_url} />
-                                            <input
-                                                type="hidden"
-                                                name="dataRoomDocumentStorageBucket"
-                                                value={document.storage_bucket ?? ''}
-                                            />
-                                            <input
-                                                type="hidden"
-                                                name="dataRoomDocumentStorageObjectPath"
-                                                value={document.storage_object_path ?? ''}
-                                            />
-                                            <Button
-                                                type="submit"
-                                                variant="ghost"
-                                                size="sm"
-                                                disabled={isDeletePending}
-                                                className="h-7 px-2 text-[10px] font-black uppercase tracking-widest text-rose-500 hover:bg-rose-50 hover:text-rose-600"
-                                            >
-                                                {isDeletePending ? '...' : 'Remove'}
-                                            </Button>
-                                        </form>
+                                    <div className="mt-2 space-y-1 border-t pt-3 border-slate-200/40 dark:border-white/5">
+                                        <a
+                                            href={document.file_url}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="block truncate text-[11px] font-bold text-emerald-600 hover:text-emerald-700 hover:underline before:absolute before:inset-0 dark:text-emerald-400 dark:hover:text-emerald-300"
+                                        >
+                                            {document.file_name || 'Open document'}
+                                        </a>
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                            <span className={`text-[10px] whitespace-nowrap ${input.textMutedClass}`}>
+                                                {formatFileSize(document.file_size_bytes)}
+                                            </span>
+                                            {document.content_type ? (
+                                                <>
+                                                    <span className="text-[10px] text-slate-300">•</span>
+                                                    <span className={`text-[10px] font-bold uppercase tracking-wider ${input.textMutedClass}`}>
+                                                        {document.content_type.split('/').pop()}
+                                                    </span>
+                                                </>
+                                            ) : null}
+                                        </div>
+                                        <p className="text-[9px] font-medium uppercase tracking-widest text-slate-400 pt-1">
+                                            Updated {new Date(document.updated_at).toLocaleDateString()}
+                                        </p>
+                                    </div>
+                                    {document.summary ? (
+                                        <p className={`mt-1 line-clamp-2 border-t pt-2 border-slate-200/40 text-[10px] font-medium leading-relaxed ${input.textMutedClass}`}>
+                                            {document.summary}
+                                        </p>
                                     ) : null}
                                 </div>
                             ))}

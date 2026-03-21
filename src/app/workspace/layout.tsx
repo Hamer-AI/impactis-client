@@ -27,7 +27,7 @@ export default async function WorkspaceLayout({
     }
 
     const user = session.user
-    const identitySnapshot = await getWorkspaceIdentityForUser(null as any, user as any)
+    const identitySnapshot = await getWorkspaceIdentityForUser(user as any)
     const { profile, membership } = identitySnapshot
 
     if (!membership) {
